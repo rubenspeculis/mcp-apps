@@ -15,9 +15,9 @@ minimumReleaseAgeExclude:
 catalog:
   # tooling
   "@biomejs/biome": 2.2.0
-  turbo: 2.5.0
-  vitest: 3.0.0
-  "@vitest/coverage-v8": 3.0.0
+  turbo: 2.9.18
+  vitest: 3.2.6
+  "@vitest/coverage-v8": 3.2.6
   typescript: 5.7.2
   "@types/node": 22.10.2
   lefthook: 1.10.1
@@ -25,17 +25,30 @@ catalog:
   "@commitlint/config-conventional": 19.6.0
   tsup: 8.3.5
   tsx: 4.19.2
-  esbuild: 0.24.2
-  wrangler: 3.95.0
-  "@changesets/cli": 2.27.11
+  esbuild: 0.25.12
+  wrangler: 3.114.17
+  "@changesets/cli": 2.31.0
   # framework runtime
-  hono: 4.6.14
-  "@hono/node-server": 1.13.7
+  hono: 4.12.26
+  "@hono/node-server": 1.19.14
   zod: 3.24.1
   "zod-to-json-schema": 3.24.1
   "@modelcontextprotocol/sdk": 1.12.0
   # vue renderer
   vue: 3.5.13
-  vite: 6.0.5
+  vite: 6.4.3
   "@vitejs/plugin-vue": 5.2.1
   jsdom: 25.0.1
+
+allowBuilds:
+  esbuild: true
+  lefthook: true
+  sharp: true
+  workerd: true
+
+overrides:
+  tmp: ">=0.2.7"
+  js-yaml: ">=4.2.0"
+  undici: ">=6.27.0"
+  ws: ">=8.21.0"
+  esbuild: ">=0.24.3"
