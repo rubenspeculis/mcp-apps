@@ -28,8 +28,9 @@ resource rendered in a sandboxed iframe, talking back over JSON-RPC `postMessage
 | `mcpapps_bridge` (Dart) | Dart↔host bridge (`runMcpApp`, `McpApp.of(context)`) over client-core via js_interop. |
 | `@mcpapps/dev` | Local host emulator + Cloudflare tunnel. |
 | `@mcpapps/cli` | `create-mcpapp` scaffolder + the `mcpapps` CLI. |
+| `@mcpapps/typegen` | Generate typed Dart models from zod schemas (zod → JSON Schema → Dart). |
 
-> Typed Dart codegen and full hot-module-reload land in later milestones.
+> Full hot-module-reload and a unified `mcpapps dev/build/deploy` land in a later milestone.
 
 ## Renderers
 

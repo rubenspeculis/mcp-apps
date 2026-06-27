@@ -1,0 +1,4 @@
+flutter/build/
+flutter/.dart_tool/
+flutter/lib/generated/
+.wrangler/

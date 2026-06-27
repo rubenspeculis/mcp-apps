@@ -3,10 +3,25 @@ import { fileURLToPath } from "node:url";
 import { serveEmulator, startCloudflareTunnel } from "@mcpapps/dev";
 import { buildFlutterComponent } from "@mcpapps/flutter";
 import { defineApp, defineTool } from "@mcpapps/server";
+import { writeDartModels } from "@mcpapps/typegen";
 import { z } from "zod";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
+
+const outputSchema = z.object({
+  tempC: z.number(),
+  condition: z.string(),
+  hourly: z.array(z.object({ hour: z.number().int(), tempC: z.number() })),
+});
+
+// Generate typed Dart models from the zod output schema — end-to-end typing
+// from the same schema the server validates against.
+await writeDartModels(
+  [{ name: "GetWeatherOutput", schema: outputSchema }],
+  resolve(root, "flutter/lib/generated/models.dart"),
+);
+console.log("✓ generated Dart models from zod schema");
 
 console.log("Building Flutter component (this can take a minute on a cold cache)…");
 // flutterBin is auto-detected (FLUTTER_BIN env, `flutter` on PATH, or fvm).
@@ -20,11 +35,7 @@ const getWeather = defineTool({
   name: "get_weather",
   description: "Current weather and a short hourly forecast for a city.",
   inputSchema: z.object({ city: z.string() }),
-  outputSchema: z.object({
-    tempC: z.number(),
-    condition: z.string(),
-    hourly: z.array(z.object({ hour: z.number(), tempC: z.number() })),
-  }),
+  outputSchema,
   ui: weatherCard,
   handler: ({ city }) => {
     const base = (city.length * 3) % 28;

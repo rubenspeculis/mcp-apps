@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mcpapps_bridge/mcpapps_bridge.dart';
 
+import 'generated/models.dart';
+
 void main() => runMcpApp(const WeatherApp());
 
 class WeatherApp extends StatelessWidget {
@@ -26,17 +28,17 @@ class WeatherCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mcp = McpApp.of(context);
-    final result = mcp.result;
-    if (result == null) {
+    final raw = mcp.result;
+    if (raw == null) {
       return const Text('Waiting for weather…');
     }
 
-    final tempC = (result['tempC'] as num).round();
-    final condition = result['condition'] as String;
-    final hourly = (result['hourly'] as List).cast<Map<String, dynamic>>();
-    final peak = hourly
-        .map((h) => (h['tempC'] as num).toDouble())
-        .fold<double>(1, (a, b) => a > b ? a : b);
+    // Typed model generated from the zod schema by @mcpapps/typegen.
+    final data = GetWeatherOutput.fromJson(raw);
+    final tempC = data.tempC.round();
+    final condition = data.condition;
+    final hourly = data.hourly;
+    final peak = hourly.map((h) => h.tempC).fold<double>(1, (a, b) => a > b ? a : b);
 
     return Container(
       width: 420,
@@ -80,7 +82,7 @@ class WeatherCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         Container(
-                          height: ((h['tempC'] as num).toDouble() / peak) * 90 + 4,
+                          height: (h.tempC / peak) * 90 + 4,
                           margin: const EdgeInsets.symmetric(horizontal: 5),
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
@@ -92,7 +94,7 @@ class WeatherCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Text('${h['hour']}h',
+                        Text('${h.hour}h',
                             style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
                       ],
                     ),
