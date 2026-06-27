@@ -1,0 +1,21 @@
+- generic [active] [ref=e1]:
+  - complementary [ref=e2]:
+    - generic [ref=e3]:
+      - heading "weather-app" [level=1] [ref=e4]
+      - generic [ref=e5]: mcpapps host emulator
+    - generic [ref=e6]:
+      - generic [ref=e7]: Tool
+      - combobox "Tool" [ref=e8]:
+        - option "get_weather" [selected]
+    - generic [ref=e9]:
+      - generic [ref=e10]: Arguments (JSON)
+      - textbox "Arguments (JSON)" [ref=e11]: "{ \"city\": \"\" }"
+    - generic [ref=e12]:
+      - button "Invoke tool" [ref=e13] [cursor=pointer]
+      - button "🌓" [ref=e14] [cursor=pointer]
+  - main [ref=e15]:
+    - generic [ref=e16]:
+      - strong [ref=e17]: Preview
+      - generic [ref=e18]: idle
+    - iframe [ref=e20]:
+      

@@ -1,0 +1,34 @@
+- generic [ref=e1]:
+  - complementary [ref=e2]:
+    - generic [ref=e3]:
+      - heading "weather-app" [level=1] [ref=e4]
+      - generic [ref=e5]: mcpapps host emulator
+    - generic [ref=e6]:
+      - generic [ref=e7]: Tool
+      - combobox "Tool" [ref=e8]:
+        - option "get_weather" [selected]
+    - generic [ref=e9]:
+      - generic [ref=e10]: Arguments (JSON)
+      - textbox "Arguments (JSON)" [ref=e11]: "{ \"city\": \"\" }"
+    - generic [ref=e12]:
+      - button "Invoke tool" [active] [ref=e13] [cursor=pointer]
+      - button "🌓" [ref=e14] [cursor=pointer]
+  - main [ref=e15]:
+    - generic [ref=e16]:
+      - strong [ref=e17]: Preview
+      - generic [ref=e18]: rendered ui://weather-app/get_weather
+    - iframe [ref=e20]:
+      - generic [ref=f1e3]:
+        - generic [ref=f1e4]:
+          - generic [ref=f1e5]:
+            - generic [ref=f1e6]: 6°
+            - generic [ref=f1e7]: Cloudy
+          - button "Refresh" [ref=f1e8] [cursor=pointer]
+        - generic [ref=f1e9]:
+          - generic [ref=f1e12]: 9h
+          - generic [ref=f1e15]: 11h
+          - generic [ref=f1e18]: 13h
+          - generic [ref=f1e21]: 15h
+          - generic [ref=f1e24]: 17h
+          - generic [ref=f1e27]: 19h
+    - generic [ref=e22]: "tool result: {\"tempC\":6,\"condition\":\"Cloudy\",\"hourly\":[{\"hour\":9,\"tempC\":4},{\"hour\":11,\"tempC\":6},{\"hour\":13,\"tempC\":8},{\"hour\":15,\"tempC\":4},{\"hour\":17,\"tempC\":6},{\"hour\":19,\"tempC\":8}]}"

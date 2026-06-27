@@ -1,0 +1,36 @@
+{
+  "name": "@mcpapps/example-weather-vue",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "codegen": "tsx scripts/build-components.ts",
+    "build": "tsx scripts/build-components.ts && tsc --noEmit",
+    "typecheck": "tsx scripts/build-components.ts && tsc --noEmit",
+    "test": "tsx scripts/build-components.ts && vitest run",
+    "dev": "tsx scripts/build-components.ts && tsx src/dev.ts",
+    "serve": "tsx scripts/build-components.ts && tsx src/server.ts",
+    "deploy": "tsx scripts/build-components.ts && wrangler deploy"
+  },
+  "dependencies": {
+    "@hono/node-server": "catalog:",
+    "@mcpapps/client-core": "workspace:*",
+    "@mcpapps/protocol": "workspace:*",
+    "@mcpapps/server": "workspace:*",
+    "@mcpapps/vue": "workspace:*",
+    "hono": "catalog:",
+    "vue": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@mcpapps/dev": "workspace:*",
+    "@mcpapps/vite-plugin-vue": "workspace:*",
+    "@types/node": "catalog:",
+    "@vitejs/plugin-vue": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

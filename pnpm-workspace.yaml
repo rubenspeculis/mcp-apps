@@ -1,0 +1,40 @@
+packages:
+  - "packages/*"
+  - "examples/*"
+
+# Supply-chain safety: refuse to install a published version until it is 7 days
+# old (10080 minutes). Excludes our own scopes so internal releases are instant.
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - "@otivo-labs/*"
+  - "@peculis/*"
+  - "@mcpapps/*"
+
+# Single source of truth for shared tooling + framework versions. Bump HERE,
+# nowhere else. Packages reference these with "catalog:" instead of a literal.
+catalog:
+  # tooling
+  "@biomejs/biome": 2.2.0
+  turbo: 2.5.0
+  vitest: 3.0.0
+  "@vitest/coverage-v8": 3.0.0
+  typescript: 5.7.2
+  "@types/node": 22.10.2
+  lefthook: 1.10.1
+  "@commitlint/cli": 19.6.0
+  "@commitlint/config-conventional": 19.6.0
+  tsup: 8.3.5
+  tsx: 4.19.2
+  wrangler: 3.95.0
+  "@changesets/cli": 2.27.11
+  # framework runtime
+  hono: 4.6.14
+  "@hono/node-server": 1.13.7
+  zod: 3.24.1
+  "zod-to-json-schema": 3.24.1
+  "@modelcontextprotocol/sdk": 1.12.0
+  # vue renderer
+  vue: 3.5.13
+  vite: 6.0.5
+  "@vitejs/plugin-vue": 5.2.1
+  jsdom: 25.0.1

@@ -1,0 +1,38 @@
+{
+  "name": "mcpapps-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "setup": "pnpm install && pnpm codegen",
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "turbo typecheck",
+    "check": "biome ci . && turbo typecheck test",
+    "codegen": "turbo codegen",
+    "clean": "turbo clean && rm -rf .turbo",
+    "clean:full": "pnpm clean && rm -rf node_modules **/node_modules",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "ship": "pnpm check && turbo build && changeset publish",
+    "prepare": "lefthook install"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@changesets/cli": "catalog:",
+    "@commitlint/cli": "catalog:",
+    "@commitlint/config-conventional": "catalog:",
+    "lefthook": "catalog:",
+    "tsup": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "@vitest/coverage-v8": "catalog:"
+  }
+}
