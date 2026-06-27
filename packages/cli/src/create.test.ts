@@ -25,21 +25,22 @@ describe("createApp (vue)", () => {
     expect(result.name).toBe("my-app");
     expect(result.files).toContain("src/app.ts");
     expect(result.files).toContain("src/components/GreetingCard.vue");
-    expect(result.files).toContain("scripts/build-components.ts");
+    expect(result.files).toContain("mcpapps.config.ts");
     expect(result.files).toContain("src/worker.ts");
 
     const pkg = JSON.parse(await readFile(join(dir, "my-app", "package.json"), "utf8"));
     expect(pkg.name).toBe("my-app");
     expect(pkg.dependencies["@mcpapps/server"]).toBe("workspace:*");
     expect(pkg.dependencies.hono).toMatch(/^\^4/);
+    expect(pkg.scripts.dev).toBe("mcpapps dev");
 
     const appTs = await readFile(join(dir, "my-app", "src/app.ts"), "utf8");
     expect(appTs).toContain('name: "my-app"');
     expect(appTs).toContain('renderer: "vue"');
     expect(appTs).not.toContain("APP_NAME");
 
-    const codegen = await readFile(join(dir, "my-app", "scripts/build-components.ts"), "utf8");
-    expect(codegen).toContain("ui://my-app/greet");
+    const config = await readFile(join(dir, "my-app", "mcpapps.config.ts"), "utf8");
+    expect(config).toContain("ui://my-app/greet");
   });
 });
 

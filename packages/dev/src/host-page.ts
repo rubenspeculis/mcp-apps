@@ -223,6 +223,12 @@ $("theme").addEventListener("click", () => {
 });
 
 loadTools().catch((e) => log("failed to load tools:", e.message));
+
+// Live-reload: re-render the current tool when the dev server signals a change.
+try {
+  const reloadSource = new EventSource("/_mcpapps/reload");
+  reloadSource.onmessage = () => { if (currentTool) { log("reloading…"); invoke(); } };
+} catch (e) { /* EventSource unavailable */ }
 </script>
 </body>
 </html>`;

@@ -4,13 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "codegen": "tsx scripts/build-components.ts",
-    "build": "tsx scripts/build-components.ts && tsc --noEmit",
-    "typecheck": "tsx scripts/build-components.ts && tsc --noEmit",
-    "test": "tsx scripts/build-components.ts && vitest run",
-    "dev": "tsx scripts/build-components.ts && tsx src/dev.ts",
-    "serve": "tsx scripts/build-components.ts && tsx src/server.ts",
-    "deploy": "tsx scripts/build-components.ts && wrangler deploy"
+    "codegen": "mcpapps build",
+    "build": "mcpapps build && tsc --noEmit",
+    "typecheck": "mcpapps build && tsc --noEmit",
+    "test": "mcpapps build && vitest run",
+    "dev": "mcpapps dev",
+    "serve": "mcpapps serve",
+    "deploy": "mcpapps deploy"
   },
   "dependencies": {
     "@hono/node-server": "catalog:",
@@ -23,11 +23,11 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@mcpapps/cli": "workspace:*",
     "@mcpapps/dev": "workspace:*",
     "@mcpapps/vite-plugin-vue": "workspace:*",
     "@types/node": "catalog:",
     "@vitejs/plugin-vue": "catalog:",
-    "tsx": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",

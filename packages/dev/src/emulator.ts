@@ -8,18 +8,22 @@ export interface EmulatorOptions {
   mcpPath?: string;
 }
 
+export interface Emulator {
+  hono: Hono;
+  /** Tell connected emulator pages to re-render (live-reload). */
+  reload: () => void;
+}
+
 /**
- * Build a Hono app that serves the MCP endpoint, the host emulator UI, and the
- * static assets of any asset-bundled (Flutter) components. The emulator drives
- * the real `/mcp` handler, so tool calls execute the actual handlers — only the
- * host chat surface is simulated.
+ * Build the emulator: serves the MCP endpoint, the host UI, asset-bundled
+ * component files (Flutter), and a live-reload SSE channel. The emulator drives
+ * the real `/mcp` handler — only the host chat surface is simulated.
  */
-export function createEmulator(app: McpApp, options: EmulatorOptions = {}): Hono {
+export function createEmulator(app: McpApp, options: EmulatorOptions = {}): Emulator {
   const mcpPath = options.mcpPath ?? "/mcp";
   const hono = new Hono();
   mountMcp(hono, app, { path: mcpPath });
 
-  // Serve assets for components that ship a multi-file bundle (Flutter).
   const components: Record<string, { basePath: string }> = {};
   for (const component of app.resourceMap.values()) {
     if (component.basePath && component.assets) {
@@ -28,10 +32,46 @@ export function createEmulator(app: McpApp, options: EmulatorOptions = {}): Hono
     }
   }
 
+  // Live-reload over Server-Sent Events.
+  const reloadClients = new Set<ReadableStreamDefaultController<Uint8Array>>();
+  const encoder = new TextEncoder();
+  hono.get("/_mcpapps/reload", () => {
+    let controllerRef: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controllerRef = controller;
+        reloadClients.add(controller);
+        controller.enqueue(encoder.encode(": connected\n\n"));
+      },
+      cancel() {
+        if (controllerRef) reloadClients.delete(controllerRef);
+      },
+    });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  });
+
   hono.get("/", (c) =>
     c.html(renderHostPage({ appName: app.name, mcpPath, renderer: app.renderer, components })),
   );
-  return hono;
+
+  return {
+    hono,
+    reload() {
+      for (const controller of reloadClients) {
+        try {
+          controller.enqueue(encoder.encode("data: reload\n\n"));
+        } catch {
+          reloadClients.delete(controller);
+        }
+      }
+    },
+  };
 }
 
 function mountComponentAssets(hono: Hono, component: CompiledComponent): void {

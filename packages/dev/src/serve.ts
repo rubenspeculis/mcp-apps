@@ -11,6 +11,8 @@ export interface RunningEmulator {
   url: string;
   port: number;
   close: () => Promise<void>;
+  /** Tell connected emulator pages to re-render (live-reload). */
+  reload: () => void;
 }
 
 /** Start the emulator + MCP server on Node and resolve once it's listening. */
@@ -19,12 +21,13 @@ export function serveEmulator(
   options: ServeEmulatorOptions = {},
 ): Promise<RunningEmulator> {
   const port = options.port ?? 5179;
-  const hono = createEmulator(app, options);
+  const { hono, reload } = createEmulator(app, options);
   return new Promise((resolve) => {
     const server = serve({ fetch: hono.fetch, port }, (info) => {
       resolve({
         url: `http://localhost:${info.port}`,
         port: info.port,
+        reload,
         close: () =>
           new Promise<void>((res) => {
             server.close(() => res());

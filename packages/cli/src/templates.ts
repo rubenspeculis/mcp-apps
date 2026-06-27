@@ -36,12 +36,11 @@ function vueTemplate({ name, dep }: TemplateOptions): Record<string, string> {
       private: true,
       type: "module",
       scripts: {
-        codegen: "tsx scripts/build-components.ts",
-        dev: "tsx scripts/build-components.ts && tsx src/dev.ts",
-        serve: "tsx scripts/build-components.ts && tsx src/server.ts",
-        build: "tsx scripts/build-components.ts && tsc --noEmit",
-        typecheck: "tsx scripts/build-components.ts && tsc --noEmit",
-        deploy: "tsx scripts/build-components.ts && wrangler deploy",
+        dev: "mcpapps dev",
+        serve: "mcpapps serve",
+        build: "mcpapps build && tsc --noEmit",
+        typecheck: "mcpapps build && tsc --noEmit",
+        deploy: "mcpapps deploy",
       },
       dependencies: {
         "@hono/node-server": V.nodeServer,
@@ -54,11 +53,11 @@ function vueTemplate({ name, dep }: TemplateOptions): Record<string, string> {
         zod: V.zod,
       },
       devDependencies: {
+        "@mcpapps/cli": dep,
         "@mcpapps/dev": dep,
         "@mcpapps/vite-plugin-vue": dep,
         "@types/node": V.typesNode,
         "@vitejs/plugin-vue": V.pluginVue,
-        tsx: V.tsx,
         typescript: V.typescript,
         vite: V.vite,
         wrangler: V.wrangler,
@@ -87,14 +86,12 @@ function vueTemplate({ name, dep }: TemplateOptions): Record<string, string> {
       "",
     ].join("\n"),
     "README.md": vueReadme(name),
+    "mcpapps.config.ts": MCPAPPS_CONFIG_TS,
     "src/shared/schemas.ts": VUE_SCHEMAS,
     "src/mcpapps.d.ts": MCPAPPS_DTS,
     "src/components/GreetingCard.vue": GREETING_VUE,
     "src/app.ts": APP_TS,
-    "scripts/build-components.ts": BUILD_COMPONENTS_TS,
-    "src/server.ts": SERVER_TS,
     "src/worker.ts": WORKER_TS,
-    "src/dev.ts": DEV_TS,
   };
 }
 
@@ -217,40 +214,21 @@ export const app = defineApp({
 });
 `;
 
-const BUILD_COMPONENTS_TS = `import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { writeComponentsModule } from "@mcpapps/vite-plugin-vue";
+const MCPAPPS_CONFIG_TS = `import { defineConfig } from "@mcpapps/cli";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const root = resolve(here, "..");
-
-await writeComponentsModule(
-  [
+export default defineConfig({
+  renderer: "vue",
+  app: "./src/app.ts",
+  generated: "./src/generated/components.ts",
+  components: [
     {
       name: "greetingCard",
-      entry: resolve(root, "src/components/GreetingCard.vue"),
+      entry: "./src/components/GreetingCard.vue",
       uri: "ui://APP_NAME/greet",
       title: "Greeting",
     },
   ],
-  resolve(root, "src/generated/components.ts"),
-  { root },
-);
-
-console.log("compiled Vue components -> src/generated/components.ts");
-`;
-
-const SERVER_TS = `import { serve } from "@hono/node-server";
-import { mountMcp } from "@mcpapps/server/hono";
-import { Hono } from "hono";
-import { app } from "./app.js";
-
-const hono = new Hono();
-mountMcp(hono, app);
-
-const port = Number(process.env.PORT ?? 8787);
-serve({ fetch: hono.fetch, port }, (info) => {
-  console.log("MCP server on http://localhost:" + info.port + "/mcp");
+  port: 5179,
 });
 `;
 
@@ -262,15 +240,6 @@ const hono = new Hono();
 mountMcp(hono, app);
 
 export default hono;
-`;
-
-const DEV_TS = `import { serveEmulator } from "@mcpapps/dev";
-import { app } from "./app.js";
-
-const port = Number(process.env.PORT ?? 5179);
-const emulator = await serveEmulator(app, { port });
-console.log("emulator " + emulator.url);
-console.log("mcp      " + emulator.url + "/mcp");
 `;
 
 const FLUTTER_DEV_TS = `import { dirname, resolve } from "node:path";

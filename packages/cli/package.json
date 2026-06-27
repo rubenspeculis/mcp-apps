@@ -24,6 +24,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
+  "dependencies": {
+    "jiti": "catalog:"
+  },
   "devDependencies": {
     "@types/node": "catalog:",
     "tsup": "catalog:",

@@ -30,7 +30,19 @@ resource rendered in a sandboxed iframe, talking back over JSON-RPC `postMessage
 | `@mcpapps/cli` | `create-mcpapp` scaffolder + the `mcpapps` CLI. |
 | `@mcpapps/typegen` | Generate typed Dart models from zod schemas (zod → JSON Schema → Dart). |
 
-> Full hot-module-reload and a unified `mcpapps dev/build/deploy` land in a later milestone.
+## The `mcpapps` CLI
+
+Inside a project (with an `mcpapps.config.ts`):
+
+```bash
+mcpapps dev       # host emulator with live-reload (edit a component → it re-renders)
+mcpapps serve     # MCP server over HTTP (add --stdio for the stdio transport)
+mcpapps build     # compile components
+mcpapps deploy    # compile + wrangler deploy
+```
+
+Live-reload re-renders the component on save and replays the last tool result, so
+edits appear instantly without losing state.
 
 ## Renderers
 
