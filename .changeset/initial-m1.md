@@ -6,6 +6,7 @@
 "@mcpapps/vite-plugin-vue": minor
 "@mcpapps/flutter": minor
 "@mcpapps/dev": minor
+"@mcpapps/cli": minor
 ---
 
 Initial release: standard-compliant MCP Apps framework on Hono with **Vue and

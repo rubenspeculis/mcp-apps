@@ -27,8 +27,9 @@ resource rendered in a sandboxed iframe, talking back over JSON-RPC `postMessage
 | `@mcpapps/flutter` | Compiles a Flutter Web app into a `ui://` component (loader HTML + cached assets). |
 | `mcpapps_bridge` (Dart) | Dart↔host bridge (`runMcpApp`, `McpApp.of(context)`) over client-core via js_interop. |
 | `@mcpapps/dev` | Local host emulator + Cloudflare tunnel. |
+| `@mcpapps/cli` | `create-mcpapp` scaffolder + the `mcpapps` CLI. |
 
-> The CLI scaffolder, typed Dart codegen, and full HMR land in later milestones.
+> Typed Dart codegen and full hot-module-reload land in later milestones.
 
 ## Renderers
 
@@ -38,7 +39,19 @@ ideal for lightweight cards. **Flutter** components are richer but multi-megabyt
 inlined `srcdoc` — best for stateful/graphical UIs. Both consume the *same* host bridge,
 so the server, emulator, and protocol are identical across them.
 
-## Quick start
+## Create a new app
+
+```bash
+pnpm create mcpapp my-app                 # Vue (default)
+pnpm create mcpapp my-app --renderer flutter
+cd my-app && pnpm install && pnpm dev
+```
+
+(or `npx create-mcpapp my-app`). The scaffolder generates a complete project —
+a tool with zod schemas, a component, the Hono server, a Workers entry, and the
+dev emulator — wired and ready to run.
+
+## Quick start (this repo)
 
 ```bash
 pnpm setup        # install + codegen

@@ -1,0 +1,33 @@
+{
+  "name": "@mcpapps/cli",
+  "version": "0.0.0",
+  "description": "Scaffold and run MCP Apps: create-mcpapp + the mcpapps CLI.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "mcpapps": "./dist/cli.js",
+    "create-mcpapp": "./dist/create-bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
