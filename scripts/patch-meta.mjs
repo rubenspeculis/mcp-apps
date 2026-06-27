@@ -1,6 +1,6 @@
 // One-off: add npm publish metadata to every publishable package.json.
 // Only adds/overwrites the shared fields below; preserves everything else.
-import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const REPO = "https://github.com/rubenspeculis/mcp-apps";
