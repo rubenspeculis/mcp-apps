@@ -32,5 +32,25 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "zod": "catalog:"
+  },
+  "author": "Rubens Peculis",
+  "homepage": "https://github.com/rubenspeculis/mcp-apps#readme",
+  "bugs": "https://github.com/rubenspeculis/mcp-apps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rubenspeculis/mcp-apps.git",
+    "directory": "packages/typegen"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-apps",
+    "mcp-ui",
+    "hono",
+    "ai"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
   }
 }
