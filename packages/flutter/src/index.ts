@@ -4,3 +4,4 @@
  */
 export { type BuildFlutterComponentOptions, buildFlutterComponent, slug } from "./build.js";
 export { mimeFor } from "./mime.js";
+export { resolveFlutterBin } from "./resolve.js";

@@ -7,13 +7,12 @@ import { z } from "zod";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
-const flutterBin = process.env.FLUTTER_BIN ?? "flutter";
 
 console.log("Building Flutter component (this can take a minute on a cold cache)…");
+// flutterBin is auto-detected (FLUTTER_BIN env, `flutter` on PATH, or fvm).
 const weatherCard = await buildFlutterComponent({
   projectDir: resolve(root, "flutter"),
   uri: "ui://weather-flutter/get_weather",
-  flutterBin,
 });
 console.log("✓ Flutter component built");
 

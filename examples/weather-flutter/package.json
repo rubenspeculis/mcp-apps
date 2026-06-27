@@ -7,7 +7,7 @@
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "dev": "tsx src/dev.ts"
+    "start": "tsx src/dev.ts"
   },
   "dependencies": {
     "@hono/node-server": "catalog:",

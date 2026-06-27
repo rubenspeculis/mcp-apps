@@ -5,6 +5,7 @@ import type { CompiledComponent, UiResourceUri } from "@mcpapps/protocol";
 import { build as esbuild } from "esbuild";
 import { HOST_GLUE_SOURCE } from "./host-glue.js";
 import { mimeFor } from "./mime.js";
+import { resolveFlutterBin } from "./resolve.js";
 
 export interface BuildFlutterComponentOptions {
   /** Flutter project directory (contains pubspec.yaml and web/). */
@@ -32,7 +33,7 @@ export interface BuildFlutterComponentOptions {
 export async function buildFlutterComponent(
   opts: BuildFlutterComponentOptions,
 ): Promise<CompiledComponent> {
-  const flutterBin = opts.flutterBin ?? "flutter";
+  const flutterBin = opts.flutterBin ?? resolveFlutterBin(opts.projectDir);
   const basePath = opts.basePath ?? `/_c/${slug(opts.uri)}/`;
 
   if (opts.pubGet !== false) {

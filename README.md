@@ -42,8 +42,15 @@ so the server, emulator, and protocol are identical across them.
 
 ```bash
 pnpm setup        # install + codegen
-pnpm dev          # turbo dev across packages
+pnpm dev          # runs the Vue example emulator -> http://localhost:5179
 pnpm check        # biome ci + typecheck + test (the CI gate)
+```
+
+To run the **Flutter** example (needs Flutter — auto-detected via `FLUTTER_BIN`,
+your PATH, or fvm) on `http://localhost:5189`:
+
+```bash
+pnpm --filter @mcpapps/example-weather-flutter start
 ```
 
 ## Status
