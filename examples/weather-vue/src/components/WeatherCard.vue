@@ -5,10 +5,13 @@ import { computed } from "vue";
 // Types flow from the zod schemas via the ToolRegistry augmentation.
 const data = useToolResult<"get_weather">();
 const refresh = useCallTool("get_weather");
+// biome-ignore lint/correctness/noUnusedVariables: used in template
 const theme = useTheme();
 
+// biome-ignore lint/correctness/noUnusedVariables: used in template
 const peak = computed(() => Math.max(1, ...(data.value?.hourly.map((h) => h.tempC) ?? [1])));
 
+// biome-ignore lint/correctness/noUnusedVariables: used in template
 async function reload() {
   if (data.value) await refresh({ city: "London" });
 }

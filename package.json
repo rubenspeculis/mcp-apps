@@ -11,6 +11,7 @@
     "dev": "turbo dev",
     "dev:vue": "pnpm --filter @mcpapps/example-weather-vue dev",
     "dev:flutter": "pnpm --filter @mcpapps/example-weather-flutter start",
+    "scaffold": "pnpm --filter @mcpapps/cli build && node packages/cli/dist/create-bin.js",
     "build": "turbo build",
     "test": "turbo test",
     "lint": "biome check .",

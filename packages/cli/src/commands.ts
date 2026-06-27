@@ -65,7 +65,9 @@ export async function devCommand(): Promise<void> {
 
   const built = await writeComponentsModule(specs, generated, { root: cwd });
   const app = ((await jiti.import(resolve(cwd, config.app))) as { app: LoadedApp }).app;
-  specs.forEach((s, i) => built[i] && app.resourceMap.set(s.uri, built[i]));
+  specs.forEach((s, i) => {
+    if (built[i]) app.resourceMap.set(s.uri, built[i]);
+  });
 
   const emulator = await serveEmulator(app, config.port ? { port: config.port } : {});
   console.log(`\n  ▸ emulator   ${emulator.url}`);
@@ -78,7 +80,9 @@ export async function devCommand(): Promise<void> {
     timer = setTimeout(async () => {
       try {
         const fresh = await writeComponentsModule(specs, generated, { root: cwd });
-        specs.forEach((s, i) => fresh[i] && app.resourceMap.set(s.uri, fresh[i]));
+        specs.forEach((s, i) => {
+          if (fresh[i]) app.resourceMap.set(s.uri, fresh[i]);
+        });
         emulator.reload();
         console.log("  ↻ reloaded");
       } catch (err) {
