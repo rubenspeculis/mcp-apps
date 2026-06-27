@@ -24,9 +24,19 @@ resource rendered in a sandboxed iframe, talking back over JSON-RPC `postMessage
 | `@mcpapps/server` | Hono-mountable MCP server: `defineApp`/`defineTool`, `ui://` resource serving. |
 | `@mcpapps/vue` | Vue hooks (`useToolResult`/`useCallTool`/`useTheme`) + renderer adapter. |
 | `@mcpapps/vite-plugin-vue` | Compiles a `.vue` component into a self-contained `ui://` HTML resource. |
-| `@mcpapps/dev` | Local host emulator + HMR + tunnel. |
+| `@mcpapps/flutter` | Compiles a Flutter Web app into a `ui://` component (loader HTML + cached assets). |
+| `mcpapps_bridge` (Dart) | Dart↔host bridge (`runMcpApp`, `McpApp.of(context)`) over client-core via js_interop. |
+| `@mcpapps/dev` | Local host emulator + Cloudflare tunnel. |
 
-> Flutter renderer (`@mcpapps/flutter`, `mcpapps_bridge`) and the CLI land in later milestones.
+> The CLI scaffolder, typed Dart codegen, and full HMR land in later milestones.
+
+## Renderers
+
+Each app picks one renderer. **Vue** components are self-contained (tens of KB) and
+ideal for lightweight cards. **Flutter** components are richer but multi-megabyte
+(CanvasKit), so they are served as cached assets and loaded via iframe `src` rather than
+inlined `srcdoc` — best for stateful/graphical UIs. Both consume the *same* host bridge,
+so the server, emulator, and protocol are identical across them.
 
 ## Quick start
 

@@ -32,6 +32,13 @@ export interface CompiledComponent {
   html: string;
   /** Optional extra resources (e.g. Flutter/CanvasKit assets) keyed by sub-path. */
   assets?: Record<string, { body: string | Uint8Array; mimeType: string }>;
+  /**
+   * Path the component + its assets are served from, with leading/trailing
+   * slashes (e.g. `/_c/weather/`). Set for asset-bundled renderers (Flutter)
+   * whose multi-file output cannot be inlined into a single srcdoc string; the
+   * host loads such a component via an iframe `src` rather than `srcdoc`.
+   */
+  basePath?: string;
 }
 
 /**

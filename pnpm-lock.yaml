@@ -30,6 +30,9 @@ catalogs:
     '@vitest/coverage-v8':
       specifier: 3.0.0
       version: 3.0.0
+    esbuild:
+      specifier: 0.24.2
+      version: 0.24.2
     hono:
       specifier: 4.6.14
       version: 4.6.14
@@ -101,6 +104,46 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 3.0.0(@types/node@26.0.0)(jiti@2.6.1)(tsx@4.19.2)
+
+  examples/weather-flutter:
+    dependencies:
+      '@hono/node-server':
+        specifier: 'catalog:'
+        version: 1.13.7(hono@4.6.14)
+      '@mcpapps/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@mcpapps/dev':
+        specifier: workspace:*
+        version: link:../../packages/dev
+      '@mcpapps/flutter':
+        specifier: workspace:*
+        version: link:../../packages/flutter
+      '@mcpapps/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@mcpapps/server':
+        specifier: workspace:*
+        version: link:../../packages/server
+      hono:
+        specifier: 'catalog:'
+        version: 4.6.14
+      zod:
+        specifier: 'catalog:'
+        version: 3.24.1
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.10.2
+      tsx:
+        specifier: 'catalog:'
+        version: 4.19.2
+      typescript:
+        specifier: 'catalog:'
+        version: 5.7.2
+      vitest:
+        specifier: 'catalog:'
+        version: 3.0.0(@types/node@22.10.2)(jiti@2.6.1)(tsx@4.19.2)
 
   examples/weather-vue:
     dependencies:
@@ -187,6 +230,28 @@ importers:
       hono:
         specifier: 'catalog:'
         version: 4.6.14
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.10.2
+      tsup:
+        specifier: 'catalog:'
+        version: 8.3.5(jiti@2.6.1)(postcss@8.5.15)(tsx@4.19.2)(typescript@5.7.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.7.2
+      vitest:
+        specifier: 'catalog:'
+        version: 3.0.0(@types/node@22.10.2)(jiti@2.6.1)(tsx@4.19.2)
+
+  packages/flutter:
+    dependencies:
+      '@mcpapps/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      esbuild:
+        specifier: 'catalog:'
+        version: 0.24.2
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

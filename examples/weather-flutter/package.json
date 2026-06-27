@@ -1,0 +1,28 @@
+{
+  "name": "@mcpapps/example-weather-flutter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "dev": "tsx src/dev.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "catalog:",
+    "@mcpapps/client-core": "workspace:*",
+    "@mcpapps/dev": "workspace:*",
+    "@mcpapps/flutter": "workspace:*",
+    "@mcpapps/protocol": "workspace:*",
+    "@mcpapps/server": "workspace:*",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

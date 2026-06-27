@@ -6,10 +6,17 @@ import { AppMethods, AppNotifications, HostMethods } from "@mcpapps/protocol";
  * uses, so the component cannot tell the emulator from Claude/ChatGPT. Tool
  * calls run against the same `/mcp` endpoint the real host would hit.
  */
-export function renderHostPage(opts: { appName: string; mcpPath: string }): string {
+export function renderHostPage(opts: {
+  appName: string;
+  mcpPath: string;
+  renderer: string;
+  components: Record<string, { basePath: string }>;
+}): string {
   const config = JSON.stringify({
     appName: opts.appName,
     mcpPath: opts.mcpPath,
+    renderer: opts.renderer,
+    components: opts.components,
     methods: {
       ready: AppMethods.Ready,
       callTool: HostMethods.CallTool,
@@ -153,11 +160,22 @@ async function invoke() {
   const uri = currentTool._meta && currentTool._meta.ui && currentTool._meta.ui.resourceUri;
   if (!uri) { $("status").textContent = "tool has no UI"; return; }
 
-  const read = await rpc("resources/read", { uri });
-  const html = read.contents[0].text;
-  // Reload the iframe with the component; it will post ui/ready when mounted.
-  $("view").srcdoc = html;
-  $("status").textContent = "rendered " + uri;
+  const view = $("view");
+  const bundled = CONFIG.components[uri];
+  if (bundled && bundled.basePath) {
+    // Asset-bundled (Flutter): load from a served URL so relative assets resolve.
+    view.removeAttribute("srcdoc");
+    view.setAttribute("sandbox", "allow-scripts allow-same-origin");
+    view.src = bundled.basePath;
+    $("status").textContent = "rendered (flutter) " + uri;
+  } else {
+    // Self-contained (Vue): inline the HTML via srcdoc in a strict sandbox.
+    const read = await rpc("resources/read", { uri });
+    view.setAttribute("sandbox", "allow-scripts");
+    view.removeAttribute("src");
+    view.srcdoc = read.contents[0].text;
+    $("status").textContent = "rendered " + uri;
+  }
 }
 
 // Host side of the postMessage JSON-RPC link with the iframe component.

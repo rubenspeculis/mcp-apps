@@ -1,0 +1,17 @@
+name: weather_flutter
+description: Flutter MCP App component example.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  mcpapps_bridge:
+    path: ../../../packages/flutter_bridge
+
+flutter:
+  uses-material-design: true
