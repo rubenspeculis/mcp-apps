@@ -50,7 +50,8 @@ To run the **Flutter** example (needs Flutter — auto-detected via `FLUTTER_BIN
 your PATH, or fvm) on `http://localhost:5189`:
 
 ```bash
-pnpm --filter @mcpapps/example-weather-flutter start
+pnpm dev:flutter   # alias for: pnpm --filter @mcpapps/example-weather-flutter start
+pnpm dev:vue       # the Vue example explicitly (same as pnpm dev)
 ```
 
 ## Status

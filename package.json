@@ -9,6 +9,8 @@
   "scripts": {
     "setup": "pnpm install && pnpm codegen",
     "dev": "turbo dev",
+    "dev:vue": "pnpm --filter @mcpapps/example-weather-vue dev",
+    "dev:flutter": "pnpm --filter @mcpapps/example-weather-flutter start",
     "build": "turbo build",
     "test": "turbo test",
     "lint": "biome check .",
