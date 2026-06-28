@@ -1,6 +1,7 @@
 packages:
   - "packages/*"
   - "examples/*"
+  - "docs"
 
 # Supply-chain safety: refuse to install a published version until it is 7 days
 # old (10080 minutes). Excludes our own scopes so internal releases are instant.
@@ -9,6 +10,11 @@ minimumReleaseAgeExclude:
   - "@otivo-labs/*"
   - "@peculis/*"
   - "@mcpapps/*"
+  # Docs site (private Nuxt/Docus app) — fast-moving ecosystem, not a published
+  # supply-chain surface, so exempt from the 7-day maturity gate.
+  - "docus"
+  - "exsolve"
+  - "@iconify-json/*"
 
 # Single source of truth for shared tooling + framework versions. Bump HERE,
 # nowhere else. Packages reference these with "catalog:" instead of a literal.
@@ -36,15 +42,18 @@ catalog:
   "zod-to-json-schema": 3.24.1
   "@modelcontextprotocol/sdk": 1.12.0
   # vue renderer
-  vue: 3.5.13
+  vue: 3.5.38
   vite: 6.4.3
   "@vitejs/plugin-vue": 5.2.1
   jsdom: 25.0.1
 
 allowBuilds:
+  "@parcel/watcher": true
+  better-sqlite3: true
   esbuild: true
   lefthook: true
   sharp: true
+  vue-demi: true
   workerd: true
 
 overrides:

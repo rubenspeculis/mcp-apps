@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mcpapps-docs",
+  "compatibility_date": "2024-12-30",
+  // Fully prerendered (SSG) site served as Cloudflare Workers Static Assets —
+  // no server Worker, no runtime database. Unmatched routes fall back to the
+  // SPA shell so the client router can resolve them.
+  "assets": {
+    "directory": "./.output/public",
+    "not_found_handling": "single-page-application"
+  },
+  "dev": {
+    "port": 7001
+  }
+}

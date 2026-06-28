@@ -1,0 +1,8 @@
+.nuxt/
+.output/
+.data/
+dist/
+dist
+.wrangler/
+node_modules/
+*.log

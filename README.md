@@ -15,6 +15,15 @@ resource rendered in a sandboxed iframe, talking back over JSON-RPC `postMessage
   Dart models for Flutter.
 - **Full local dev** — a host emulator, hot reload, and a public tunnel.
 
+## Documentation
+
+Full documentation lives in [`docs/`](./docs) — a Nuxt/Docus site deployed to Cloudflare Workers.
+
+```bash
+pnpm docs:dev      # run the docs site locally (http://localhost:7001)
+pnpm docs:deploy   # build (SSG) + wrangler deploy
+```
+
 ## Packages
 
 | Package | Responsibility |

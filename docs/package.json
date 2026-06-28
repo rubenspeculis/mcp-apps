@@ -1,0 +1,21 @@
+{
+  "name": "@mcpapps/docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt generate",
+    "generate": "nuxt generate",
+    "preview": "wrangler dev",
+    "deploy": "nuxt generate && wrangler deploy"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "docus": "^5.12.3",
+    "nuxt": "^4.4.8"
+  },
+  "devDependencies": {
+    "wrangler": "catalog:"
+  }
+}
