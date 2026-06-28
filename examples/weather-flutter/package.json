@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc --noEmit",
-    "typecheck": "tsc --noEmit",
+    "build": "tsx src/codegen.ts && tsc --noEmit",
+    "typecheck": "tsx src/codegen.ts && tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "start": "tsx src/dev.ts",
     "deploy": "tsx src/pre-deploy.ts && wrangler deploy"

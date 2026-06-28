@@ -104,8 +104,8 @@ function flutterTemplate({ name, dep }: TemplateOptions): Record<string, string>
       type: "module",
       scripts: {
         start: "tsx src/dev.ts",
-        build: "tsc --noEmit",
-        typecheck: "tsc --noEmit",
+        build: "tsx src/codegen.ts && tsc --noEmit",
+        typecheck: "tsx src/codegen.ts && tsc --noEmit",
         deploy: "tsx src/pre-deploy.ts && wrangler deploy",
       },
       dependencies: {
@@ -150,6 +150,7 @@ function flutterTemplate({ name, dep }: TemplateOptions): Record<string, string>
       assets: { directory: "dist" },
     }),
     "README.md": flutterReadme(name),
+    "src/codegen.ts": FLUTTER_CODEGEN_TS,
     "src/dev.ts": FLUTTER_DEV_TS,
     "src/pre-deploy.ts": FLUTTER_PRE_DEPLOY_TS,
     "src/worker.ts": FLUTTER_WORKER_TS,
@@ -253,6 +254,27 @@ const hono = new Hono();
 mountMcp(hono, app);
 
 export default hono;
+`;
+
+const FLUTTER_CODEGEN_TS = `import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Generates a type stub so \`tsc --noEmit\` can resolve the import in worker.ts.
+// The real file is written by pre-deploy.ts (requires a Flutter build).
+const here = dirname(fileURLToPath(import.meta.url));
+const metaDir = resolve(here, "generated");
+await mkdir(metaDir, { recursive: true });
+await writeFile(
+  join(metaDir, "component-meta.ts"),
+  [
+    "// Auto-generated stub -- overwritten by pre-deploy.ts at deploy time",
+    'export const COMPONENT_URI = "ui://APP_NAME/greet";',
+    'export const COMPONENT_HTML = "";',
+    'export const COMPONENT_BASE_PATH = "/_c/stub/";',
+    "",
+  ].join("\\n"),
+);
 `;
 
 const FLUTTER_DEV_TS = `import { dirname, resolve } from "node:path";
