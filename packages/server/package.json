@@ -29,8 +29,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@mcpapps/protocol": "workspace:*",
-    "zod-to-json-schema": "catalog:"
+    "@mcpapps/protocol": "workspace:*"
   },
   "peerDependencies": {
     "hono": "catalog:",

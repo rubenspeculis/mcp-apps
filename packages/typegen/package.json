@@ -20,9 +20,6 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "dependencies": {
-    "zod-to-json-schema": "catalog:"
-  },
   "peerDependencies": {
     "zod": "catalog:"
   },

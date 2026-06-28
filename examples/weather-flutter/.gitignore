@@ -1,4 +1,6 @@
 flutter/build/
 flutter/.dart_tool/
 flutter/lib/generated/
+src/generated/
+dist/
 .wrangler/

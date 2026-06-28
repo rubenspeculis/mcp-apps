@@ -5,7 +5,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { type JsonSchemaLike, jsonSchemaToDart } from "./json-schema-to-dart.js";
 
 export { type JsonSchemaLike, jsonSchemaToDart } from "./json-schema-to-dart.js";
@@ -25,10 +24,7 @@ const DART_HEADER = [
 /** Generate Dart source (header + one class tree per spec) from zod schemas. */
 export function zodToDart(specs: DartModelSpec[]): string {
   const blocks = specs.map((spec) => {
-    const json = zodToJsonSchema(spec.schema, {
-      target: "jsonSchema7",
-      $refStrategy: "none",
-    }) as JsonSchemaLike;
+    const json = spec.schema.toJSONSchema() as JsonSchemaLike;
     return jsonSchemaToDart(spec.name, json);
   });
   return `${[DART_HEADER, ...blocks].join("\n\n")}\n`;

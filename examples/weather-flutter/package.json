@@ -7,7 +7,8 @@
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "start": "tsx src/dev.ts"
+    "start": "tsx src/dev.ts",
+    "deploy": "tsx src/pre-deploy.ts && wrangler deploy"
   },
   "dependencies": {
     "@hono/node-server": "catalog:",
@@ -24,6 +25,7 @@
     "@types/node": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
   }
 }

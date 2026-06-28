@@ -15,6 +15,14 @@ minimumReleaseAgeExclude:
   - "docus"
   - "exsolve"
   - "@iconify-json/*"
+  - '@cloudflare/workerd-darwin-64@1.20260625.1'
+  - '@cloudflare/workerd-darwin-arm64@1.20260625.1'
+  - '@cloudflare/workerd-linux-64@1.20260625.1'
+  - '@cloudflare/workerd-linux-arm64@1.20260625.1'
+  - '@cloudflare/workerd-windows-64@1.20260625.1'
+  - miniflare@4.20260625.0
+  - workerd@1.20260625.1
+  - wrangler@4.105.0
 
 # Single source of truth for shared tooling + framework versions. Bump HERE,
 # nowhere else. Packages reference these with "catalog:" instead of a literal.
@@ -33,12 +41,12 @@ catalog:
   tsx: 4.19.2
   jiti: 2.4.2
   esbuild: 0.25.12
-  wrangler: 3.114.17
+  wrangler: 4.105.0
   "@changesets/cli": 2.31.0
   # framework runtime
   hono: 4.12.26
   "@hono/node-server": 1.19.14
-  zod: 3.24.1
+  zod: 4.4.3
   "zod-to-json-schema": 3.24.1
   "@modelcontextprotocol/sdk": 1.12.0
   # vue renderer

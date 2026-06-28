@@ -6,7 +6,6 @@ import {
   type JsonRpcSuccess,
   MCP_APP_MIME,
 } from "@mcpapps/protocol";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import type { AnyToolDefinition, McpApp } from "./define.js";
 
 /** MCP protocol version this server speaks (echoes the client's if compatible). */
@@ -200,8 +199,8 @@ function negotiateVersion(params: unknown): string {
   return requested ?? SUPPORTED_PROTOCOL_VERSION;
 }
 
-function toJsonSchema(schema: Parameters<typeof zodToJsonSchema>[0]) {
-  const result = zodToJsonSchema(schema, { target: "jsonSchema7" }) as Record<string, unknown>;
+function toJsonSchema(schema: { toJSONSchema(): unknown }) {
+  const result = schema.toJSONSchema() as Record<string, unknown>;
   delete result.$schema;
   return result;
 }
