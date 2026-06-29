@@ -1,5 +1,13 @@
 # @mcpapps/client-core
 
+## 0.1.1
+
+### Patch Changes
+
+- Minor release update to get all tags up to date
+- Updated dependencies
+  - @mcpapps/protocol@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes
