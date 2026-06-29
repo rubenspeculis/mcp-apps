@@ -1,5 +1,11 @@
 # @mcpapps/server
 
+## 0.1.2
+
+### Patch Changes
+
+- @mcpapps/protocol@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes
