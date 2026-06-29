@@ -8,7 +8,7 @@ import type { ComponentEntry, McpAppConfig } from "./config.js";
 type ResourceMap = Map<string, unknown>;
 type LoadedApp = { name: string; renderer: string; resourceMap: ResourceMap };
 type CompiledComponent = { uri: string; html: string };
-type ComponentSpec = {
+export type ComponentSpec = {
   name: string;
   entry: string;
   uri: string;
@@ -32,18 +32,21 @@ type DevPkg = {
   ) => Promise<{ url: string; reload: () => void }>;
 };
 
-function jitiFor(cwd: string) {
+export function jitiFor(cwd: string) {
   return createJiti(resolve(cwd, "_cli.js"), { interopDefault: true });
 }
 
-async function loadConfig(cwd: string, jiti: ReturnType<typeof createJiti>): Promise<McpAppConfig> {
+export async function loadConfig(
+  cwd: string,
+  jiti: ReturnType<typeof createJiti>,
+): Promise<McpAppConfig> {
   const mod = (await jiti.import(resolve(cwd, "mcpapps.config.ts"))) as
     | McpAppConfig
     | { default: McpAppConfig };
   return "renderer" in mod ? mod : mod.default;
 }
 
-function specsFor(cwd: string, config: McpAppConfig): ComponentSpec[] {
+export function specsFor(cwd: string, config: McpAppConfig): ComponentSpec[] {
   return (config.components ?? []).map((c) => ({
     name: c.name,
     entry: resolve(cwd, c.entry),
@@ -56,7 +59,7 @@ function specsFor(cwd: string, config: McpAppConfig): ComponentSpec[] {
   }));
 }
 
-function generatedPath(cwd: string, config: McpAppConfig) {
+export function generatedPath(cwd: string, config: McpAppConfig) {
   return resolve(cwd, config.generated ?? "src/generated/components.ts");
 }
 

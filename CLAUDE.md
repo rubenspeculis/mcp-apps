@@ -21,5 +21,5 @@ Allows inline scripts, `eval`, WebAssembly, and `blob:`/`data:` dynamic `import(
 - `tsconfig.base.json` sets **`exactOptionalPropertyTypes`** — never assign explicit `undefined` to an optional prop; gate with a conditional or widen with `| undefined`.
 - Conventional commits; **commitlint body lines ≤100 chars**; lefthook pre-commit runs biome; commits land on `main`.
 - Flutter builds via **fvm** (`.fvmrc` pins version); `flutter build web --no-web-resources-cdn` bundles CanvasKit locally.
-- `examples/weather-flutter` uses a **local path** dep on `packages/flutter_bridge`; the CLI template scaffolds a **git** dep — push bridge changes before scaffolded projects see them.
+- `examples/weather-flutter` uses a **local path** dep on `packages/flutter_bridge`. The CLI scaffolds the bridge dep version-aware (`create.ts:detectBridgeDep`): a **local path** when run in-repo, else a **git** dep pinned to `ref: v<cli version>` — so published scaffolds track a release tag, not `main` (the release must cut that tag).
 - Dep versions pinned in the `pnpm-workspace.yaml` **catalog** with `minimumReleaseAge: 10080` (7-day supply-chain gate).

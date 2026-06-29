@@ -9,6 +9,12 @@ export type UiResourceUri = `ui://${string}`;
  * sandbox iframe's Content-Security-Policy. All arrays of origin strings;
  * wildcard subdomains (`https://*.example.com`) are allowed. Omitted/empty =
  * no external access (the secure default).
+ *
+ * The four buckets below are the *only* CSP surface in this version — arbitrary
+ * directives (`worker-src`, `form-action`, `object-src`, independent `media-src`,
+ * `report-to`, …) are intentionally not exposed. The buckets cover the common
+ * cases and keep the host-side sandbox policy simple; a raw escape hatch is on
+ * the roadmap if real apps hit the boundary.
  */
 export interface McpUiResourceCsp {
   /** `connect-src` — fetch/XHR/WebSocket targets. */

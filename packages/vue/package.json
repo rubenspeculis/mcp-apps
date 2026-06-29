@@ -28,6 +28,7 @@
     "vue": "catalog:"
   },
   "devDependencies": {
+    "jsdom": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",

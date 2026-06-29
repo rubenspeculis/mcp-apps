@@ -6,6 +6,12 @@ export interface TemplateOptions {
   renderer: Renderer;
   /** Version spec for @mcpapps/* deps ("workspace:*" in-repo, else a range). */
   dep: string;
+  /**
+   * Pubspec dependency block for `mcpapps_bridge` (Flutter only). A local `path:`
+   * dep when scaffolding in-repo, else a git dep pinned to the CLI's release tag.
+   * Vue templates ignore it.
+   */
+  bridgeDep: string;
 }
 
 /** Build the full file map (relative path -> contents) for a new project. */
@@ -40,6 +46,7 @@ function vueTemplate({ name, dep }: TemplateOptions): Record<string, string> {
         serve: "mcpapps serve",
         build: "mcpapps build && tsc --noEmit",
         typecheck: "mcpapps build && tsc --noEmit",
+        audit: "mcpapps audit",
         deploy: "mcpapps deploy",
       },
       dependencies: {
@@ -95,7 +102,7 @@ function vueTemplate({ name, dep }: TemplateOptions): Record<string, string> {
   };
 }
 
-function flutterTemplate({ name, dep }: TemplateOptions): Record<string, string> {
+function flutterTemplate({ name, dep, bridgeDep }: TemplateOptions): Record<string, string> {
   return {
     "package.json": json({
       name,
@@ -106,6 +113,7 @@ function flutterTemplate({ name, dep }: TemplateOptions): Record<string, string>
         start: "tsx src/dev.ts",
         build: "tsx src/codegen.ts && tsc --noEmit",
         typecheck: "tsx src/codegen.ts && tsc --noEmit",
+        audit: "mcpapps audit",
         deploy: "tsx src/pre-deploy.ts && wrangler deploy",
       },
       dependencies: {
@@ -118,6 +126,7 @@ function flutterTemplate({ name, dep }: TemplateOptions): Record<string, string>
         zod: V.zod,
       },
       devDependencies: {
+        "@mcpapps/cli": dep,
         "@mcpapps/dev": dep,
         "@types/node": V.typesNode,
         tsx: V.tsx,
@@ -157,7 +166,7 @@ function flutterTemplate({ name, dep }: TemplateOptions): Record<string, string>
     "src/pre-deploy.ts": FLUTTER_PRE_DEPLOY_TS,
     "src/worker.ts": FLUTTER_WORKER_TS,
     "flutter/.fvmrc": '{\n  "flutter": "3.41.9"\n}\n',
-    "flutter/pubspec.yaml": flutterPubspec(name),
+    "flutter/pubspec.yaml": flutterPubspec(name, bridgeDep),
     "flutter/web/index.html": FLUTTER_INDEX_HTML,
     "flutter/lib/main.dart": FLUTTER_MAIN_DART,
   };
@@ -390,6 +399,9 @@ const app = defineApp({
 
 const hono = new Hono();
 mountMcp(hono, app);
+
+// \`app\` is exported so \`mcpapps audit\` can introspect the tools.
+export { app };
 export default hono;
 `;
 
@@ -437,7 +449,7 @@ class GreetingApp extends StatelessWidget {
 }
 `;
 
-function flutterPubspec(name: string): string {
+function flutterPubspec(name: string, bridgeDep: string): string {
   const dartName = name.replace(/[^a-z0-9_]/gi, "_").toLowerCase();
   return [
     `name: ${dartName}`,
@@ -452,10 +464,7 @@ function flutterPubspec(name: string): string {
     "dependencies:",
     "  flutter:",
     "    sdk: flutter",
-    "  mcpapps_bridge:",
-    "    git:",
-    "      url: https://github.com/rubenspeculis/mcp-apps.git",
-    "      path: packages/flutter_bridge",
+    bridgeDep,
     "",
     "flutter:",
     "  uses-material-design: true",

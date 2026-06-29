@@ -43,6 +43,9 @@ catalog:
   esbuild: 0.25.12
   wrangler: 4.105.0
   "@changesets/cli": 2.31.0
+  # `mcpapps audit --runtime` drives the dev emulator in a headless browser.
+  # Lazy-imported by the CLI, so it stays a dev/CI-only dep (never shipped).
+  playwright: 1.61.0
   # framework runtime
   hono: 4.12.26
   "@hono/node-server": 1.19.14

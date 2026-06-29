@@ -1,4 +1,5 @@
 import { runCreate } from "./args.js";
+import { auditCommand } from "./audit.js";
 import { buildCommand, deployCommand, devCommand, serveCommand } from "./commands.js";
 
 const [command, ...rest] = process.argv.slice(2);
@@ -15,6 +16,9 @@ switch (command) {
     break;
   case "build":
     await buildCommand();
+    break;
+  case "audit":
+    await auditCommand(rest);
     break;
   case "deploy":
     await deployCommand();
@@ -38,6 +42,8 @@ Commands:
   dev                  Serve the host emulator with live-reload (vue)
   serve [--stdio]      Run the MCP server (HTTP or stdio)
   build                Compile components
+  audit [--static-only | --runtime]
+                       Validate the app conforms to the MCP Apps spec
   deploy               Compile components and deploy to Cloudflare Workers
 
 Run inside a project that has an mcpapps.config.ts (except "create").`);

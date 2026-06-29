@@ -98,18 +98,27 @@ export async function buildFlutterComponent(
     assets["index.html"] = { body: html, mimeType: "text/html" };
     component = { uri: opts.uri, html, assets, basePath };
   }
-  // Flutter web fetches Noto fallback fonts from fonts.gstatic.com at runtime
-  // (for glyphs outside the bundled font — symbols, emoji, CJK). Declare it so
-  // the host's CSP permits the connection; merged with any caller-provided CSP.
-  const FONT_CDN = "https://fonts.gstatic.com";
-  const csp = { ...(opts.csp ?? {}) };
-  csp.connectDomains = uniq([...(csp.connectDomains ?? []), FONT_CDN]);
-  csp.resourceDomains = uniq([...(csp.resourceDomains ?? []), FONT_CDN]);
-  component.csp = csp;
+  component.csp = withFlutterFontCsp(opts.csp);
   if (opts.permissions) component.permissions = opts.permissions;
   if (opts.domain) component.domain = opts.domain;
   if (opts.prefersBorder !== undefined) component.prefersBorder = opts.prefersBorder;
   return component;
+}
+
+/** Origin Flutter web fetches Noto fallback fonts from at runtime. */
+export const FLUTTER_FONT_CDN = "https://fonts.gstatic.com";
+
+/**
+ * Merge the Flutter runtime font origin (`fonts.gstatic.com`) into a caller's
+ * CSP. Flutter web fetches Noto fallback fonts from there at runtime (for glyphs
+ * outside the bundled font — symbols, emoji, CJK), so the host's CSP must permit
+ * the connection. Caller-provided origins are preserved and de-duplicated.
+ */
+export function withFlutterFontCsp(csp?: McpUiResourceCsp): McpUiResourceCsp {
+  const out: McpUiResourceCsp = { ...(csp ?? {}) };
+  out.connectDomains = uniq([...(out.connectDomains ?? []), FLUTTER_FONT_CDN]);
+  out.resourceDomains = uniq([...(out.resourceDomains ?? []), FLUTTER_FONT_CDN]);
+  return out;
 }
 
 function uniq(items: string[]): string[] {

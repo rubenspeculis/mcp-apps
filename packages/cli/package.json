@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "playwright": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

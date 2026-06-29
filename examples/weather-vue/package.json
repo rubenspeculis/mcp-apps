@@ -10,6 +10,7 @@
     "test": "mcpapps build && vitest run",
     "dev": "mcpapps dev",
     "serve": "mcpapps serve",
+    "audit": "mcpapps audit",
     "deploy": "mcpapps deploy"
   },
   "dependencies": {

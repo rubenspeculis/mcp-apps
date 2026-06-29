@@ -8,6 +8,7 @@
     "typecheck": "tsx src/codegen.ts && tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "start": "tsx src/dev.ts",
+    "audit": "mcpapps audit",
     "deploy": "tsx src/pre-deploy.ts && wrangler deploy"
   },
   "dependencies": {
@@ -21,6 +22,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@mcpapps/cli": "workspace:*",
+    "@mcpapps/dev": "workspace:*",
     "@mcpapps/typegen": "workspace:*",
     "@types/node": "catalog:",
     "tsx": "catalog:",

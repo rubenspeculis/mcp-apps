@@ -55,6 +55,7 @@ export async function runCreate(argv: string[]): Promise<void> {
     renderer,
     ...(typeof flags.name === "string" ? { name: flags.name } : {}),
     ...(typeof flags.dep === "string" ? { dep: flags.dep } : {}),
+    ...(typeof flags["bridge-dep"] === "string" ? { bridgeDep: flags["bridge-dep"] } : {}),
     force: flags.force === true,
   });
 
@@ -73,6 +74,7 @@ Options:
   --renderer <vue|flutter>   Renderer to scaffold (default: vue)
   --name <name>              Package name (default: directory name)
   --dep <spec>               @mcpapps/* dependency spec (default: auto)
+  --bridge-dep <yaml>        Flutter mcpapps_bridge pubspec dep block (default: auto)
   --force                    Scaffold into a non-empty directory
   --help                     Show this help`);
 }

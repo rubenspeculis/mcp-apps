@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref to save minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Playwright is not in pnpm's allowBuilds, so its browser is NOT downloaded
+      # here — the core gate stays fast. Runtime audit (mcpapps audit) installs
+      # chromium on demand; the static audit below needs no browser.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check (biome + typecheck + tests)
+        run: pnpm check
+
+      - name: Build
+        run: pnpm build
+
+      # Exercise the audit command end-to-end (static layer — no browser, no
+      # Flutter SDK) so spec-conformance regressions surface in CI.
+      - name: Audit examples (static)
+        run: |
+          pnpm --filter @mcpapps/example-weather-vue exec mcpapps audit --static-only
+          pnpm --filter @mcpapps/example-weather-flutter exec mcpapps audit --static-only

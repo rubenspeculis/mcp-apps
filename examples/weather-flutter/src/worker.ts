@@ -40,4 +40,7 @@ const app = defineApp({
 
 const hono = new Hono();
 mountMcp(hono, app);
+
+// `app` is exported so `mcpapps audit` can introspect the tools.
+export { app };
 export default hono;
