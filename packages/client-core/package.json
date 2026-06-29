@@ -1,6 +1,6 @@
 {
   "name": "@mcpapps/client-core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Renderer-agnostic in-iframe runtime for MCP Apps: the only postMessage JSON-RPC peer.",
   "type": "module",
   "license": "MIT",
