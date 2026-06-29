@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// `pnpm create mcpapp <dir>` resolves this package and runs this bin. The real
-// scaffolding lives in @mcpapps/cli's public `createApp`; this is a thin entry
-// that parses flags and delegates, so the logic has a single home.
+// `pnpm create @mcpapps <dir>` resolves @mcpapps/create and runs this bin. The
+// real scaffolding lives in @mcpapps/cli's public `createApp`; this is a thin
+// entry that parses flags and delegates, so the logic has a single home.
 import { createApp } from "@mcpapps/cli";
 
 const argv = process.argv.slice(2);
@@ -26,7 +26,7 @@ for (let i = 0; i < argv.length; i++) {
 
 const targetDir = positionals[0];
 if (!targetDir || flags.help) {
-  console.log(`create-mcpapp <directory> [options]
+  console.log(`pnpm create @mcpapps <directory> [options]
 
 Options:
   --renderer <vue|flutter>   Renderer to scaffold (default: vue)

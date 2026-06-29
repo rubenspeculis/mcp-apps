@@ -1,12 +1,12 @@
-# create-mcpapp
+# @mcpapps/create
 
 Scaffold a new [**MCP App**](https://github.com/rubenspeculis/mcp-apps) — an interactive
 `ui://` component a host like Claude renders in a sandboxed iframe.
 
 ```bash
-pnpm create mcpapp my-app                  # Vue (default)
-pnpm create mcpapp my-app --renderer flutter
-# or: npm create mcpapp@latest my-app
+pnpm create @mcpapps my-app                  # Vue (default)
+pnpm create @mcpapps my-app --renderer flutter
+# or: npm create @mcpapps@latest my-app
 ```
 
 Options:

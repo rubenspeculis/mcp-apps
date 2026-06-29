@@ -1,12 +1,13 @@
 # @mcpapps/cli
 
-Scaffold and run **MCP Apps**. Ships two binaries: `create-mcpapp` (scaffolder) and
-`mcpapps` (dev/build/audit/deploy). The CLI loads your project's `app` and its
-`@mcpapps/*` packages at runtime, so its own install footprint stays small.
+The `mcpapps` command that runs **MCP Apps** in a project (dev/serve/build/audit/deploy).
+It loads your project's `app` and its `@mcpapps/*` packages at runtime, so its own install
+footprint stays small. To scaffold a new project, use
+[`@mcpapps/create`](https://www.npmjs.com/package/@mcpapps/create):
 
 ```bash
 # Scaffold a new project (Vue or Flutter)
-pnpm create mcpapp my-app --renderer vue
+pnpm create @mcpapps my-app --renderer vue
 ```
 
 Inside a project:
