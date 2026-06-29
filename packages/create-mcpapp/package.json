@@ -1,0 +1,35 @@
+{
+  "name": "create-mcpapp",
+  "version": "0.1.0",
+  "description": "Scaffold a new MCP App (Vue or Flutter): `pnpm create mcpapp <dir>`.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "create-mcpapp": "./bin/create-mcpapp.mjs"
+  },
+  "files": [
+    "bin"
+  ],
+  "dependencies": {
+    "@mcpapps/cli": "workspace:*"
+  },
+  "author": "Rubens Peculis",
+  "homepage": "https://github.com/rubenspeculis/mcp-apps#readme",
+  "bugs": "https://github.com/rubenspeculis/mcp-apps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rubenspeculis/mcp-apps.git",
+    "directory": "packages/create-mcpapp"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-apps",
+    "mcp-ui",
+    "create",
+    "scaffold"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
