@@ -1,5 +1,15 @@
 # @mcpapps/cli
 
+## 0.1.2
+
+### Patch Changes
+
+- 321f6e8: fix(create): only emit `workspace:*` deps inside the mcp-apps monorepo
+
+  Scaffolding into another pnpm workspace previously matched the host's
+  `pnpm-workspace.yaml` and emitted `workspace:*` / local-path deps that the host
+  can't resolve. Detection now confirms the root is the mcp-apps monorepo.
+
 ## 0.1.1
 
 ### Patch Changes

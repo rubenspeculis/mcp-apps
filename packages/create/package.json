@@ -1,6 +1,6 @@
 {
   "name": "@mcpapps/create",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Scaffold a new MCP App (Vue or Flutter): `pnpm create @mcpapps`.",
   "type": "module",
   "license": "MIT",

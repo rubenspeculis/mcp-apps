@@ -1,5 +1,12 @@
 # @mcpapps/vue
 
+## 0.1.2
+
+### Patch Changes
+
+- @mcpapps/client-core@0.1.2
+- @mcpapps/protocol@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes
