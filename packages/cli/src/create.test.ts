@@ -83,8 +83,10 @@ describe("createApp (flutter)", () => {
   });
 
   it("uses a local path dep for mcpapps_bridge when scaffolding in-repo", async () => {
-    // Fake a monorepo root: a workspace marker + a flutter_bridge package.
+    // Fake the @mcpapps monorepo root: a workspace marker, the identifying root
+    // package.json name, and a flutter_bridge package.
     await writeFile(join(dir, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n");
+    await writeFile(join(dir, "package.json"), JSON.stringify({ name: "mcpapps-monorepo" }));
     await mkdir(join(dir, "packages/flutter_bridge"), { recursive: true });
     await writeFile(join(dir, "packages/flutter_bridge/pubspec.yaml"), "name: mcpapps_bridge\n");
 
@@ -95,6 +97,25 @@ describe("createApp (flutter)", () => {
     // Relative path from apps/fl-app/flutter -> packages/flutter_bridge.
     expect(pubspec).toContain("path: ../../../packages/flutter_bridge");
     expect(pubspec).not.toContain("git:");
+  });
+
+  it("emits published deps when scaffolding into a foreign pnpm workspace", async () => {
+    // A different monorepo (e.g. otivo-agentic) is itself a pnpm workspace. Its
+    // marker must NOT be mistaken for ours, or the scaffold gets `workspace:*`
+    // deps the host can't resolve (ERR_PNPM_WORKSPACE_PKG_NOT_FOUND).
+    await writeFile(join(dir, "pnpm-workspace.yaml"), "packages:\n  - apps/*\n");
+    await writeFile(join(dir, "package.json"), JSON.stringify({ name: "otivo-agentic" }));
+
+    await createApp({ targetDir: join(dir, "apps/mcp"), renderer: "flutter" });
+
+    const pkg = JSON.parse(await readFile(join(dir, "apps/mcp", "package.json"), "utf8"));
+    expect(pkg.devDependencies["@mcpapps/cli"]).toMatch(/^\^\d/);
+    expect(pkg.devDependencies["@mcpapps/cli"]).not.toBe("workspace:*");
+    expect(pkg.dependencies["@mcpapps/server"]).toMatch(/^\^\d/);
+
+    const pubspec = await readFile(join(dir, "apps/mcp", "flutter/pubspec.yaml"), "utf8");
+    expect(pubspec).toContain("url: https://github.com/rubenspeculis/mcp-apps.git");
+    expect(pubspec).not.toContain("path: ../"); // never a local path off-repo
   });
 });
 

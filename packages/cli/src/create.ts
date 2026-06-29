@@ -49,16 +49,31 @@ export async function createApp(opts: CreateOptions): Promise<CreateResult> {
   return { dir, name, renderer, files: written.sort() };
 }
 
-/** Walk up from `dir` to find the @mcpapps monorepo root (pnpm-workspace.yaml). */
+/**
+ * Walk up from `dir` to find the @mcpapps monorepo root. A `pnpm-workspace.yaml`
+ * alone is not enough — scaffolding into *another* pnpm monorepo would otherwise
+ * match the host's workspace and emit unresolvable `workspace:*` deps. We keep
+ * walking past foreign workspaces and only accept this repo's root.
+ */
 function findWorkspaceRoot(dir: string): string | null {
   let cur = dir;
   for (let i = 0; i < 8; i++) {
-    if (existsSync(join(cur, "pnpm-workspace.yaml"))) return cur;
+    if (existsSync(join(cur, "pnpm-workspace.yaml")) && isMcpAppsRoot(cur)) return cur;
     const parent = dirname(cur);
     if (parent === cur) break;
     cur = parent;
   }
   return null;
+}
+
+/** True only for the @mcpapps monorepo root — guards against foreign pnpm workspaces. */
+function isMcpAppsRoot(root: string): boolean {
+  try {
+    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { name?: string };
+    return pkg.name === "mcpapps-monorepo";
+  } catch {
+    return false;
+  }
 }
 
 /**
