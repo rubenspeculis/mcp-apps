@@ -1,11 +1,11 @@
 {
-  "name": "create-mcpapp",
+  "name": "@mcpapps/create",
   "version": "0.1.0",
-  "description": "Scaffold a new MCP App (Vue or Flutter): `pnpm create mcpapp <dir>`.",
+  "description": "Scaffold a new MCP App (Vue or Flutter): `pnpm create @mcpapps`.",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "create-mcpapp": "./bin/create-mcpapp.mjs"
+    "mcpapps-create": "./bin/mcpapps-create.mjs"
   },
   "files": [
     "bin"
@@ -19,7 +19,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/rubenspeculis/mcp-apps.git",
-    "directory": "packages/create-mcpapp"
+    "directory": "packages/create"
   },
   "keywords": [
     "mcp",

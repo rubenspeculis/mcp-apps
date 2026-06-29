@@ -111,7 +111,7 @@ One contract, your choice of stack
   A complete [CLI]{.text-primary}
 
   #description
-  `create-mcpapp` scaffolds a runnable project; `mcpapps dev / serve / build / deploy` takes it from localhost to production.
+  `@mcpapps/create` scaffolds a runnable project; `mcpapps dev / serve / build / deploy` takes it from localhost to production.
   :::
 ::
 

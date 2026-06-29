@@ -36,7 +36,7 @@ pnpm docs:deploy   # build (SSG) + wrangler deploy
 | `@mcpapps/flutter` | Compiles a Flutter Web app into a `ui://` component (loader HTML + cached assets). |
 | `mcpapps_bridge` (Dart) | Dart↔host bridge (`runMcpApp`, `McpApp.of(context)`) over client-core via js_interop. |
 | `@mcpapps/dev` | Local host emulator + Cloudflare tunnel. |
-| `@mcpapps/cli` | `create-mcpapp` scaffolder + the `mcpapps` CLI. |
+| `@mcpapps/cli` | `@mcpapps/create` scaffolder + the `mcpapps` CLI. |
 | `@mcpapps/typegen` | Generate typed Dart models from zod schemas (zod → JSON Schema → Dart). |
 
 ## The `mcpapps` CLI
@@ -64,12 +64,12 @@ so the server, emulator, and protocol are identical across them.
 ## Create a new app
 
 ```bash
-pnpm create mcpapp my-app                 # Vue (default)
-pnpm create mcpapp my-app --renderer flutter
+pnpm create @mcpapps my-app                 # Vue (default)
+pnpm create @mcpapps my-app --renderer flutter
 cd my-app && pnpm install && pnpm dev
 ```
 
-(or `npx create-mcpapp my-app`). The scaffolder generates a complete project —
+(or `npm create @mcpapps@latest my-app`). The scaffolder generates a complete project —
 a tool with zod schemas, a component, the Hono server, a Workers entry, and the
 dev emulator — wired and ready to run.
 
