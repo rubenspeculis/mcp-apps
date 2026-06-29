@@ -1,6 +1,6 @@
 {
   "name": "@mcpapps/server",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Hono-mountable, Workers-native MCP server for MCP Apps: defineApp/defineTool + ui:// resources.",
   "type": "module",
   "license": "MIT",

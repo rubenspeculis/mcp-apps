@@ -1,0 +1,15 @@
+# @mcpapps/server
+
+## 0.1.0
+
+### Minor Changes
+
+- 75e759a: Initial release: standard-compliant MCP Apps framework on Hono with **Vue and
+  Flutter** renderers, end-to-end type safety from zod schemas, a host emulator,
+  Cloudflare Workers support (fetch-native), stdio transport, and a Cloudflare
+  tunnel helper.
+
+### Patch Changes
+
+- Updated dependencies [75e759a]
+  - @mcpapps/protocol@0.1.0
