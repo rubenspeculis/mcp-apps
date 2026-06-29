@@ -5,7 +5,9 @@
   "compatibility_date": "2025-09-01",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
-    // Pre-built Flutter web files, written by src/pre-deploy.ts
-    "directory": "dist"
+    // Inlined Flutter HTML, written by src/pre-deploy.ts. The `ASSETS` binding
+    // lets the Worker read it at request time and return it from resources/read.
+    "directory": "dist",
+    "binding": "ASSETS"
   }
 }

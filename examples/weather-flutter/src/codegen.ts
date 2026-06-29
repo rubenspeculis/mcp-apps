@@ -12,8 +12,8 @@ await writeFile(
   [
     "// Auto-generated stub — overwritten by pre-deploy.ts at deploy time",
     'export const COMPONENT_URI = "ui://weather-flutter/get_weather";',
-    'export const COMPONENT_HTML = "";',
-    'export const COMPONENT_BASE_PATH = "/_c/stub/";',
+    'export const COMPONENT_HTML_ASSET = "/_c/stub/index.html";',
+    'export const COMPONENT_CSP = { connectDomains: ["https://fonts.gstatic.com"] };',
     "",
   ].join("\n"),
 );

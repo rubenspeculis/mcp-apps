@@ -9,6 +9,7 @@ import type {
 } from "@mcpapps/protocol";
 import { build as esbuild } from "esbuild";
 import { HOST_GLUE_SOURCE } from "./host-glue.js";
+import { inlineFlutterBuild } from "./inline.js";
 import { mimeFor } from "./mime.js";
 import { resolveFlutterBin } from "./resolve.js";
 
@@ -34,6 +35,12 @@ export interface BuildFlutterComponentOptions {
   extraArgs?: string[];
   /** Run `flutter pub get` before building. Default true. */
   pubGet?: boolean;
+  /**
+   * Produce a single self-contained HTML document (all assets inlined) instead
+   * of an `assets` map + `basePath`. Required for hosts (Claude) that only serve
+   * a single `text/html;profile=mcp-app` resource with no sibling files.
+   */
+  inline?: boolean;
   /** CSP allowlists emitted into the component's `_meta.ui.csp`. */
   csp?: McpUiResourceCsp;
   /** Capability requests emitted into `_meta.ui.permissions`. */
@@ -69,27 +76,44 @@ export async function buildFlutterComponent(
   await runFlutter(flutterBin, args, opts.projectDir);
 
   const webDir = join(opts.projectDir, "build", "web");
-  const assets: NonNullable<CompiledComponent["assets"]> = {};
-  for await (const file of walk(webDir)) {
-    const rel = relative(webDir, file).split(sep).join("/");
-    assets[rel] = { body: new Uint8Array(await readFile(file)), mimeType: mimeFor(rel) };
-  }
 
   // Bundle the client-core glue (resolved from the Flutter project's deps).
   const glue = await bundleHostGlue(opts.projectDir);
-  assets["mcpapps-host.js"] = { body: glue, mimeType: "text/javascript" };
 
-  const indexAsset = assets["index.html"];
-  const indexHtml = indexAsset ? toText(indexAsset.body) : "<!doctype html><head></head>";
-  const html = injectHostScript(indexHtml);
-  assets["index.html"] = { body: html, mimeType: "text/html" };
-
-  const component: CompiledComponent = { uri: opts.uri, html, assets, basePath };
-  if (opts.csp) component.csp = opts.csp;
+  let component: CompiledComponent;
+  if (opts.inline) {
+    // Single self-contained HTML — no sibling assets, no basePath.
+    const html = await inlineFlutterBuild({ webDir, hostGlue: glue });
+    component = { uri: opts.uri, html };
+  } else {
+    const assets: NonNullable<CompiledComponent["assets"]> = {};
+    for await (const file of walk(webDir)) {
+      const rel = relative(webDir, file).split(sep).join("/");
+      assets[rel] = { body: new Uint8Array(await readFile(file)), mimeType: mimeFor(rel) };
+    }
+    assets["mcpapps-host.js"] = { body: glue, mimeType: "text/javascript" };
+    const indexAsset = assets["index.html"];
+    const indexHtml = indexAsset ? toText(indexAsset.body) : "<!doctype html><head></head>";
+    const html = injectHostScript(indexHtml);
+    assets["index.html"] = { body: html, mimeType: "text/html" };
+    component = { uri: opts.uri, html, assets, basePath };
+  }
+  // Flutter web fetches Noto fallback fonts from fonts.gstatic.com at runtime
+  // (for glyphs outside the bundled font — symbols, emoji, CJK). Declare it so
+  // the host's CSP permits the connection; merged with any caller-provided CSP.
+  const FONT_CDN = "https://fonts.gstatic.com";
+  const csp = { ...(opts.csp ?? {}) };
+  csp.connectDomains = uniq([...(csp.connectDomains ?? []), FONT_CDN]);
+  csp.resourceDomains = uniq([...(csp.resourceDomains ?? []), FONT_CDN]);
+  component.csp = csp;
   if (opts.permissions) component.permissions = opts.permissions;
   if (opts.domain) component.domain = opts.domain;
   if (opts.prefersBorder !== undefined) component.prefersBorder = opts.prefersBorder;
   return component;
+}
+
+function uniq(items: string[]): string[] {
+  return [...new Set(items)];
 }
 
 export function slug(uri: string): string {

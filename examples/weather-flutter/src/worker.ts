@@ -2,7 +2,7 @@ import { defineApp, defineTool } from "@mcpapps/server";
 import { mountMcp } from "@mcpapps/server/hono";
 import { Hono } from "hono";
 import { z } from "zod";
-import { COMPONENT_BASE_PATH, COMPONENT_HTML, COMPONENT_URI } from "./generated/component-meta.js";
+import { COMPONENT_CSP, COMPONENT_HTML_ASSET, COMPONENT_URI } from "./generated/component-meta.js";
 
 const outputSchema = z.object({
   tempC: z.number(),
@@ -15,7 +15,9 @@ const getWeather = defineTool({
   description: "Current weather and a short hourly forecast for a city.",
   inputSchema: z.object({ city: z.string() }),
   outputSchema,
-  ui: { uri: COMPONENT_URI, html: COMPONENT_HTML, basePath: COMPONENT_BASE_PATH },
+  // Self-contained inlined Flutter, served from a static asset (see pre-deploy).
+  // COMPONENT_CSP declares fonts.gstatic.com (Flutter's runtime font fallback).
+  ui: { uri: COMPONENT_URI, html: "", htmlAsset: COMPONENT_HTML_ASSET, csp: COMPONENT_CSP },
   handler: ({ city }) => {
     const base = (city.length * 3) % 28;
     return {

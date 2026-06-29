@@ -16,6 +16,12 @@ export const SUPPORTED_PROTOCOL_VERSION = "2025-06-18";
 export interface McpHandlerOptions {
   /** Add permissive CORS headers (useful for the browser emulator). Default true. */
   cors?: boolean;
+  /**
+   * Resolve a component's HTML at `resources/read` time. Lets a host serve a
+   * large self-contained document from a static asset (via `component.htmlAsset`)
+   * instead of bundling it into the Worker script. Defaults to `component.html`.
+   */
+  resolveHtml?: (component: CompiledComponent, request: Request) => string | Promise<string>;
 }
 
 export type FetchHandler = (request: Request) => Promise<Response>;
@@ -64,8 +70,9 @@ export function createMcpHandler(app: McpApp, options: McpHandlerOptions = {}): 
 
     const messages = Array.isArray(payload) ? payload : [payload];
     const responses: JsonRpcMessage[] = [];
+    const ctx: DispatchCtx = { request, resolveHtml: options.resolveHtml };
     for (const message of messages) {
-      const response = await processMessage(app, message as JsonRpcMessage);
+      const response = await processMessage(app, message as JsonRpcMessage, ctx);
       if (response) responses.push(response);
     }
 
@@ -84,6 +91,7 @@ export function createMcpHandler(app: McpApp, options: McpHandlerOptions = {}): 
 export async function processMessage(
   app: McpApp,
   message: JsonRpcMessage,
+  ctx?: DispatchCtx,
 ): Promise<JsonRpcMessage | null> {
   // Notifications (no id) get no response.
   if (!("id" in message) || message.id === undefined) {
@@ -91,7 +99,7 @@ export async function processMessage(
   }
   const req = message as JsonRpcRequest;
   try {
-    const result = await dispatch(app, req);
+    const result = await dispatch(app, req, ctx);
     return { jsonrpc: "2.0", id: req.id, result } satisfies JsonRpcSuccess;
   } catch (err) {
     if (err instanceof RpcError) {
@@ -105,7 +113,15 @@ export async function processMessage(
   }
 }
 
-async function dispatch(app: McpApp, req: JsonRpcRequest): Promise<unknown> {
+/** Per-request context threaded to handlers that need the raw request or html resolver. */
+interface DispatchCtx {
+  request: Request;
+  resolveHtml:
+    | ((component: CompiledComponent, request: Request) => string | Promise<string>)
+    | undefined;
+}
+
+async function dispatch(app: McpApp, req: JsonRpcRequest, ctx?: DispatchCtx): Promise<unknown> {
   switch (req.method) {
     case "initialize":
       return {
@@ -129,7 +145,7 @@ async function dispatch(app: McpApp, req: JsonRpcRequest): Promise<unknown> {
         })),
       };
     case "resources/read":
-      return readResource(app, req.params);
+      return readResource(app, req.params, ctx);
     default:
       throw new RpcError(JsonRpcErrorCode.MethodNotFound, `Method not found: ${req.method}`);
   }
@@ -206,7 +222,7 @@ async function callTool(app: McpApp, params: unknown): Promise<unknown> {
   };
 }
 
-function readResource(app: McpApp, params: unknown): unknown {
+async function readResource(app: McpApp, params: unknown, ctx?: DispatchCtx): Promise<unknown> {
   const { uri } = (params ?? {}) as { uri?: string };
   if (!uri) throw new RpcError(JsonRpcErrorCode.InvalidParams, "Missing resource uri");
   const component = app.resourceMap.get(uri);
@@ -218,8 +234,14 @@ function readResource(app: McpApp, params: unknown): unknown {
     const widgetCsp = openaiWidgetCsp(component.csp);
     if (widgetCsp) meta["openai/widgetCSP"] = widgetCsp;
   }
+  // Resolve the HTML lazily (e.g. from a static asset) when a resolver is given
+  // and the component points at one; otherwise use the bundled `html`.
+  const text =
+    ctx?.resolveHtml && (component.htmlAsset || component.html === "")
+      ? await ctx.resolveHtml(component, ctx.request)
+      : component.html;
   return {
-    contents: [{ uri: component.uri, mimeType: MCP_APP_MIME, text: component.html, _meta: meta }],
+    contents: [{ uri: component.uri, mimeType: MCP_APP_MIME, text, _meta: meta }],
   };
 }
 

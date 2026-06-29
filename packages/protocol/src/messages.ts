@@ -67,6 +67,13 @@ export interface CompiledComponent {
    * host loads such a component via an iframe `src` rather than `srcdoc`.
    */
   basePath?: string;
+  /**
+   * Same-origin path to fetch the (large, self-contained) HTML from at request
+   * time instead of bundling it via `html`. Used for inlined Flutter, whose
+   * single document is multi-MB — too large for the Worker script bundle. The
+   * server reads it through the host's static-asset binding on `resources/read`.
+   */
+  htmlAsset?: string;
   /** CSP allowlists emitted into `_meta.ui.csp` (+ `openai/widgetCSP` compat). */
   csp?: McpUiResourceCsp;
   /** Capability requests emitted into `_meta.ui.permissions`. */
