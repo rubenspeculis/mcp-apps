@@ -26,7 +26,7 @@
     "clean:full": "pnpm clean && rm -rf node_modules **/node_modules",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "ship": "pnpm check && turbo build && changeset publish",
+    "ship": "pnpm check && turbo build && pnpm -r publish --access public --no-git-checks",
     "prepare": "lefthook install"
   },
   "devDependencies": {

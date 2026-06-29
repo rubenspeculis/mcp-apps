@@ -24,25 +24,21 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
+      # No `registry-url`: it writes an .npmrc auth placeholder that interferes
+      # with OIDC. pnpm publishes to the default npm registry and authenticates
+      # via the workflow's OIDC identity (Trusted Publishing).
       - name: Install Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-          registry-url: https://registry.npmjs.org
-
-      # Trusted Publishing (OIDC) needs npm >= 11.5.1. `changeset publish` shells
-      # out to `npm publish`, so upgrade the runner's bundled npm (Node 22 ships
-      # npm 10.x). npm then mints provenance + auth from the OIDC token itself.
-      - name: Upgrade npm for Trusted Publishing
-        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       # When changesets exist, opens/updates a "Version Packages" PR. When that
-      # PR is merged (no changesets remain), runs `pnpm ship` to publish to npm.
-      # No NPM_TOKEN: npm authenticates via the workflow's OIDC identity, which
+      # PR is merged (no changesets remain), runs `pnpm ship` — which publishes
+      # via `pnpm -r publish`. No NPM_TOKEN: pnpm authenticates over OIDC, which
       # must be registered as a Trusted Publisher for each package on npmjs.com.
       - name: Create release PR or publish
         id: changesets
@@ -53,14 +49,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Scaffolded Flutter apps pin `mcpapps_bridge` to `ref: v<version>` (a git
-      # dep). changeset publish only cuts per-package tags, so mint the matching
-      # `v<version>` tag here once a publish happens.
-      - name: Tag release for the Flutter bridge git dep
-        if: steps.changesets.outputs.published == 'true'
+      # On a release run (no pending changesets), tag the published versions:
+      # per-package tags via `changeset tag`, plus the `v<version>` tag the
+      # scaffolded Flutter `mcpapps_bridge` git dep pins to (`ref: v<version>`).
+      - name: Tag published release
+        if: steps.changesets.outputs.hasChangesets == 'false'
         run: |
+          pnpm exec changeset tag || true
           VERSION="$(node -p "require('./packages/cli/package.json').version")"
-          git tag "v${VERSION}"
-          git push origin "v${VERSION}"
+          git tag "v${VERSION}" 2>/dev/null || true
+          git push --tags
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
