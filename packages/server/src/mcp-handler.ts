@@ -1,10 +1,12 @@
 import {
+  type CompiledComponent,
   type JsonRpcError,
   JsonRpcErrorCode,
   type JsonRpcMessage,
   type JsonRpcRequest,
   type JsonRpcSuccess,
   MCP_APP_MIME,
+  type McpUiResourceCsp,
 } from "@mcpapps/protocol";
 import type { AnyToolDefinition, McpApp } from "./define.js";
 
@@ -123,6 +125,7 @@ async function dispatch(app: McpApp, req: JsonRpcRequest): Promise<unknown> {
           uri: c.uri,
           name: c.uri,
           mimeType: MCP_APP_MIME,
+          _meta: { ui: uiMetaFor(c) },
         })),
       };
     case "resources/read":
@@ -132,14 +135,35 @@ async function dispatch(app: McpApp, req: JsonRpcRequest): Promise<unknown> {
   }
 }
 
+/** Build the spec `_meta.ui` block (resourceUri + any CSP/permissions hints). */
+function uiMetaFor(c: CompiledComponent): Record<string, unknown> {
+  const ui: Record<string, unknown> = { resourceUri: c.uri };
+  if (c.csp) ui.csp = c.csp;
+  if (c.permissions) ui.permissions = c.permissions;
+  if (c.domain) ui.domain = c.domain;
+  if (c.prefersBorder !== undefined) ui.prefersBorder = c.prefersBorder;
+  return ui;
+}
+
+/** ChatGPT legacy `openai/widgetCSP` (snake_case), or undefined if nothing set. */
+function openaiWidgetCsp(csp?: McpUiResourceCsp): Record<string, string[]> | undefined {
+  if (!csp) return undefined;
+  const out: Record<string, string[]> = {};
+  if (csp.connectDomains) out.connect_domains = csp.connectDomains;
+  if (csp.resourceDomains) out.resource_domains = csp.resourceDomains;
+  return Object.keys(out).length ? out : undefined;
+}
+
 function describeTool(app: McpApp, tool: AnyToolDefinition) {
   const meta: Record<string, unknown> = {};
   if (tool.ui) {
-    meta.ui = { resourceUri: tool.ui.uri };
+    meta.ui = uiMetaFor(tool.ui);
     if (app.compat) {
       // Mirror vendor-specific keys so the same server works across hosts.
       meta["openai/outputTemplate"] = tool.ui.uri;
       meta["mcpui.dev/ui-resource-uri"] = tool.ui.uri;
+      const widgetCsp = openaiWidgetCsp(tool.ui.csp);
+      if (widgetCsp) meta["openai/widgetCSP"] = widgetCsp;
     }
   }
   return {
@@ -189,8 +213,13 @@ function readResource(app: McpApp, params: unknown): unknown {
   if (!component) {
     throw new RpcError(JsonRpcErrorCode.InvalidParams, `Unknown resource: ${uri}`);
   }
+  const meta: Record<string, unknown> = { ui: uiMetaFor(component) };
+  if (app.compat) {
+    const widgetCsp = openaiWidgetCsp(component.csp);
+    if (widgetCsp) meta["openai/widgetCSP"] = widgetCsp;
+  }
   return {
-    contents: [{ uri: component.uri, mimeType: MCP_APP_MIME, text: component.html }],
+    contents: [{ uri: component.uri, mimeType: MCP_APP_MIME, text: component.html, _meta: meta }],
   };
 }
 

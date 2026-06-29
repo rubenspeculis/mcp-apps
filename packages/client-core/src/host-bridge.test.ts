@@ -1,9 +1,9 @@
 import {
-  AppNotifications,
+  type HostContext,
   HostMethods,
+  HostNotifications,
   type JsonRpcMessage,
   type JsonRpcRequest,
-  type ThemeState,
   type ToolResultEnvelope,
 } from "@mcpapps/protocol";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,16 +13,26 @@ import { createMockTransportPair, type Transport } from "./transport.js";
 /** A tiny scriptable host that drives the host side of a mock transport pair. */
 function makeHost(transport: Transport) {
   const requests: JsonRpcRequest[] = [];
+  const notifications: JsonRpcMessage[] = [];
   transport.onMessage((m) => {
     if ("method" in m && "id" in m) requests.push(m as JsonRpcRequest);
+    else if ("method" in m) notifications.push(m);
   });
   return {
     requests,
+    notifications,
     notifyToolResult(env: ToolResultEnvelope) {
-      transport.send({ jsonrpc: "2.0", method: AppNotifications.ToolResult, params: env });
+      transport.send({ jsonrpc: "2.0", method: HostNotifications.ToolResult, params: env });
     },
-    notifyTheme(theme: ThemeState) {
-      transport.send({ jsonrpc: "2.0", method: AppNotifications.Theme, params: theme });
+    notifyHostContext(ctx: HostContext) {
+      transport.send({ jsonrpc: "2.0", method: HostNotifications.HostContextChanged, params: ctx });
+    },
+    notifyToolInput(args: Record<string, unknown>) {
+      transport.send({
+        jsonrpc: "2.0",
+        method: HostNotifications.ToolInput,
+        params: { arguments: args },
+      });
     },
     respond(id: number, result: unknown) {
       transport.send({ jsonrpc: "2.0", id, result } as JsonRpcMessage);
@@ -67,6 +77,13 @@ describe("createHostBridge", () => {
     expect(late).toHaveBeenCalledWith(expect.objectContaining({ structuredContent: { tempC: 9 } }));
   });
 
+  it("delivers tool-input notifications to subscribers", async () => {
+    const seen = vi.fn();
+    bridge.onToolInput(seen);
+    host.notifyToolInput({ city: "Berlin" });
+    await vi.waitFor(() => expect(seen).toHaveBeenCalledWith({ city: "Berlin" }));
+  });
+
   it("starts at the default light theme and replays it on subscribe", () => {
     const seen = vi.fn();
     bridge.onTheme(seen);
@@ -74,9 +91,10 @@ describe("createHostBridge", () => {
     expect(bridge.getTheme().colorScheme).toBe("light");
   });
 
-  it("updates theme on a theme notification", async () => {
-    host.notifyTheme({ colorScheme: "dark", tokens: { "--bg": "#000" } });
+  it("updates theme + tokens on a host-context-changed notification", async () => {
+    host.notifyHostContext({ theme: "dark", styles: { variables: { "--bg": "#000" } } });
     await vi.waitFor(() => expect(bridge.getTheme().colorScheme).toBe("dark"));
+    expect(bridge.getTheme().tokens).toEqual({ "--bg": "#000" });
   });
 
   it("correlates a callTool request with its response", async () => {
@@ -114,15 +132,39 @@ describe("createHostBridge", () => {
     await expect(promise).rejects.toThrow("no such city");
   });
 
-  it("sends a ready notification", async () => {
-    const seen: JsonRpcMessage[] = [];
-    // Re-wire a host that records all messages (not just requests).
-    const pair = createMockTransportPair();
-    pair.host.onMessage((m) => seen.push(m));
-    const b = createHostBridge({ transport: pair.app });
-    b.ready();
+  it("runs the ui/initialize handshake then sends initialized", async () => {
+    const done = bridge.initialize();
+    await vi.waitFor(() => expect(host.requests).toHaveLength(1));
+    const req = host.requests[0];
+    expect(req?.method).toBe(HostMethods.Initialize);
+
+    host.respond(req?.id as number, {
+      protocolVersion: "2026-01-26",
+      hostContext: { theme: "dark" },
+    });
+    await done;
+
+    expect(bridge.getTheme().colorScheme).toBe("dark");
+    expect(
+      host.notifications.some((m) => "method" in m && m.method === HostNotifications.ToolResult),
+    ).toBe(false);
+    expect(
+      host.notifications.some((m) => "method" in m && m.method === "ui/notifications/initialized"),
+    ).toBe(true);
+  });
+
+  it("reports size via ui/notifications/size-changed", async () => {
+    bridge.reportSize(420, 260);
     await vi.waitFor(() =>
-      expect(seen.some((m) => "method" in m && m.method === "ui/ready")).toBe(true),
+      expect(
+        host.notifications.some(
+          (m) => "method" in m && m.method === "ui/notifications/size-changed",
+        ),
+      ).toBe(true),
     );
+    const sized = host.notifications.find(
+      (m) => "method" in m && m.method === "ui/notifications/size-changed",
+    ) as JsonRpcMessage & { params?: { width: number; height: number } };
+    expect(sized?.params).toEqual({ width: 420, height: 260 });
   });
 });

@@ -2,15 +2,25 @@ import { spawn } from "node:child_process";
 import { watch } from "node:fs";
 import { resolve } from "node:path";
 import { createJiti } from "jiti";
-import type { McpAppConfig } from "./config.js";
+import type { ComponentEntry, McpAppConfig } from "./config.js";
 
 // Minimal shapes for the project-local modules we load dynamically via jiti.
 type ResourceMap = Map<string, unknown>;
 type LoadedApp = { name: string; renderer: string; resourceMap: ResourceMap };
 type CompiledComponent = { uri: string; html: string };
+type ComponentSpec = {
+  name: string;
+  entry: string;
+  uri: string;
+  title?: string;
+  csp?: ComponentEntry["csp"];
+  permissions?: ComponentEntry["permissions"];
+  domain?: string;
+  prefersBorder?: boolean;
+};
 type VitePlugin = {
   writeComponentsModule: (
-    specs: { name: string; entry: string; uri: string; title?: string }[],
+    specs: ComponentSpec[],
     outFile: string,
     opts: { root: string },
   ) => Promise<CompiledComponent[]>;
@@ -33,12 +43,16 @@ async function loadConfig(cwd: string, jiti: ReturnType<typeof createJiti>): Pro
   return "renderer" in mod ? mod : mod.default;
 }
 
-function specsFor(cwd: string, config: McpAppConfig) {
+function specsFor(cwd: string, config: McpAppConfig): ComponentSpec[] {
   return (config.components ?? []).map((c) => ({
     name: c.name,
     entry: resolve(cwd, c.entry),
     uri: c.uri,
     ...(c.title ? { title: c.title } : {}),
+    ...(c.csp ? { csp: c.csp } : {}),
+    ...(c.permissions ? { permissions: c.permissions } : {}),
+    ...(c.domain ? { domain: c.domain } : {}),
+    ...(c.prefersBorder !== undefined ? { prefersBorder: c.prefersBorder } : {}),
   }));
 }
 

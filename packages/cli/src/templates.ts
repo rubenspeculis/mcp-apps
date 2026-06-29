@@ -240,6 +240,10 @@ export default defineConfig({
       entry: "./src/components/GreetingCard.vue",
       uri: "ui://APP_NAME/greet",
       title: "Greeting",
+      // Declare external origins your component contacts at runtime (omit = none).
+      // Emitted into the resource's _meta.ui.csp (+ openai/widgetCSP for ChatGPT).
+      // csp: { connectDomains: ["https://api.example.com"], resourceDomains: ["https://cdn.example.com"] },
+      // permissions: { clipboardWrite: {} },
     },
   ],
   port: 5179,
@@ -366,6 +370,8 @@ const greet = defineTool({
   description: "Greet someone by name.",
   inputSchema: z.object({ name: z.string() }),
   outputSchema: z.object({ greeting: z.string(), emoji: z.string() }),
+  // Add csp/permissions here to declare external origins (omit = none):
+  //   ui: { uri: ..., html: ..., basePath: ..., csp: { connectDomains: ["https://api.example.com"] } }
   ui: { uri: COMPONENT_URI, html: COMPONENT_HTML, basePath: COMPONENT_BASE_PATH },
   handler: ({ name }) => ({ greeting: "Hello, " + name + "!", emoji: "👋" }),
 });
@@ -465,6 +471,20 @@ function vueReadme(name: string): string {
     "pnpm deploy    # Cloudflare Workers",
     "```",
     "",
+    "## Hosts & CSP",
+    "",
+    "The runtime follows the MCP Apps spec (`2026-01-26`): it runs the `ui/initialize`",
+    "handshake and reports its size via `ui/notifications/size-changed`, so flexible",
+    "host iframes (e.g. Claude, which gives the iframe no fixed height) size correctly.",
+    "",
+    "In Claude you may see `Unrecognized Content-Security-Policy directive 'webrtc'`",
+    "and a favicon `404` in the console — these are injected by the host, not your app,",
+    "and block nothing.",
+    "",
+    "To call external APIs, declare the origins in `mcpapps.config.ts` via `csp`",
+    "(`connectDomains`/`resourceDomains`); they are emitted into the resource's",
+    "`_meta.ui.csp` (and the ChatGPT `openai/widgetCSP` key when `compat: true`).",
+    "",
   ].join("\n");
 }
 
@@ -480,6 +500,27 @@ function flutterReadme(name: string): string {
     "pnpm install",
     "pnpm start     # builds the Flutter web app + host emulator -> http://localhost:5189",
     "```",
+    "",
+    "## Host compatibility (read this)",
+    "",
+    "The runtime follows the MCP Apps spec (`2026-01-26`): `ui/initialize` handshake +",
+    "`ui/notifications/size-changed` sizing, with the host's `containerDimensions` (or a",
+    "default) sizing the view.",
+    "",
+    "**Flutter does not currently render in Claude.** The MCP Apps MVP only supports a",
+    "single self-contained `text/html;profile=mcp-app` document — there is no mechanism",
+    "for sibling/relative asset files, multi-file apps, or host-proxied assets, and the",
+    "`externalUrl` content type is deferred. So Claude's content proxy 404s a Flutter",
+    "build's `main.dart.js` / `flutter_bootstrap.js` / `canvaskit.*` files. Even self-",
+    "contained, CanvasKit needs `script-src 'wasm-unsafe-eval'`, which the sandbox CSP",
+    "does not grant (and `_meta.ui.csp` cannot request). The Flutter renderer works in",
+    "the local emulator (`pnpm start`) and on hosts that add `externalUrl`/wasm support;",
+    "for Claude today, use the Vue renderer (self-contained, no wasm).",
+    "",
+    "The `webrtc` CSP warning and favicon `404` you may see in Claude are host-injected",
+    "noise, not app errors. CanvasKit is bundled locally",
+    "(`flutter build web --no-web-resources-cdn`) so the emulator and external-URL hosts",
+    "load it same-origin.",
     "",
   ].join("\n");
 }

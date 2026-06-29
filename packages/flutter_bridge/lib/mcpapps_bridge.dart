@@ -10,7 +10,8 @@ import 'package:flutter/widgets.dart';
 external _Host get _host;
 
 extension type _Host(JSObject _) implements JSObject {
-  external void ready();
+  external JSPromise<JSString> initialize();
+  external void reportSize(int width, int height);
   external String getToolResult();
   external String getTheme();
   external void onToolResult(JSFunction cb);
@@ -50,8 +51,14 @@ class McpAppController extends ChangeNotifier {
     return _decodeResult(res.toDart);
   }
 
-  /// Tell the host the app has mounted (flushes the queued tool result).
-  void ready() => _host.ready();
+  /// Run the host handshake (`ui/initialize` → `initialized`), which unblocks
+  /// the host's tool-result delivery and sizes the Flutter viewport.
+  Future<void> initialize() async {
+    await _host.initialize().toDart;
+  }
+
+  /// Report the rendered content size so a flexible host iframe can size to it.
+  void reportSize(int width, int height) => _host.reportSize(width, height);
 
   Map<String, dynamic>? _decodeResult(String raw) {
     if (raw.isEmpty || raw == 'null') return null;
@@ -88,10 +95,12 @@ class McpApp {
 }
 
 /// Boot a Flutter MCP App component: wire the host bridge, mount [child], then
-/// signal readiness so the host delivers the initial tool result.
+/// run the host handshake so the host delivers the initial tool result and
+/// sizes the (flexible) iframe.
 void runMcpApp(Widget child) {
   WidgetsFlutterBinding.ensureInitialized();
   final controller = McpAppController();
   runApp(McpAppScope(controller: controller, child: child));
-  controller.ready();
+  // Fire-and-forget: the JS glue sizes the viewport + reports size on resolve.
+  controller.initialize();
 }

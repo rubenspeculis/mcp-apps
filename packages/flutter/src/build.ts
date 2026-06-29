@@ -1,7 +1,12 @@
 import { spawn } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import type { CompiledComponent, UiResourceUri } from "@mcpapps/protocol";
+import type {
+  CompiledComponent,
+  McpUiPermissions,
+  McpUiResourceCsp,
+  UiResourceUri,
+} from "@mcpapps/protocol";
 import { build as esbuild } from "esbuild";
 import { HOST_GLUE_SOURCE } from "./host-glue.js";
 import { mimeFor } from "./mime.js";
@@ -18,10 +23,25 @@ export interface BuildFlutterComponentOptions {
   basePath?: string;
   /** Pass `--release` (default) vs `--profile` for faster dev builds. */
   release?: boolean;
+  /**
+   * Load CanvasKit from the gstatic CDN instead of bundling it. Default `false`
+   * — i.e. pass `--no-web-resources-cdn` so CanvasKit is served same-origin
+   * from `<base-href>/canvaskit/`. The sandbox CSP (`script-src 'self'`,
+   * `connect-src 'none'`) blocks the CDN, so bundling is required to render.
+   */
+  webResourcesCdn?: boolean;
   /** Extra args appended to `flutter build web`. */
   extraArgs?: string[];
   /** Run `flutter pub get` before building. Default true. */
   pubGet?: boolean;
+  /** CSP allowlists emitted into the component's `_meta.ui.csp`. */
+  csp?: McpUiResourceCsp;
+  /** Capability requests emitted into `_meta.ui.permissions`. */
+  permissions?: McpUiPermissions;
+  /** Dedicated sandbox origin, emitted into `_meta.ui.domain`. */
+  domain?: string;
+  /** Border preference, emitted into `_meta.ui.prefersBorder`. */
+  prefersBorder?: boolean;
 }
 
 /**
@@ -41,6 +61,9 @@ export async function buildFlutterComponent(
   }
 
   const args = ["build", "web", "--base-href", basePath];
+  // Bundle CanvasKit (no gstatic CDN) so it loads same-origin under the sandbox
+  // CSP. Opt back into the CDN only if explicitly requested.
+  if (opts.webResourcesCdn !== true) args.push("--no-web-resources-cdn");
   args.push(opts.release === false ? "--profile" : "--release");
   if (opts.extraArgs) args.push(...opts.extraArgs);
   await runFlutter(flutterBin, args, opts.projectDir);
@@ -61,7 +84,12 @@ export async function buildFlutterComponent(
   const html = injectHostScript(indexHtml);
   assets["index.html"] = { body: html, mimeType: "text/html" };
 
-  return { uri: opts.uri, html, assets, basePath };
+  const component: CompiledComponent = { uri: opts.uri, html, assets, basePath };
+  if (opts.csp) component.csp = opts.csp;
+  if (opts.permissions) component.permissions = opts.permissions;
+  if (opts.domain) component.domain = opts.domain;
+  if (opts.prefersBorder !== undefined) component.prefersBorder = opts.prefersBorder;
+  return component;
 }
 
 export function slug(uri: string): string {

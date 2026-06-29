@@ -1,10 +1,12 @@
-import { AppMethods, AppNotifications, HostMethods } from "@mcpapps/protocol";
+import { AppNotifications, HostMethods, HostNotifications } from "@mcpapps/protocol";
 
 /**
  * The emulator's host surface. Renders a compiled component in a *real*
- * sandboxed iframe and speaks the exact mcp-ui postMessage JSON-RPC a real host
- * uses, so the component cannot tell the emulator from Claude/ChatGPT. Tool
- * calls run against the same `/mcp` endpoint the real host would hit.
+ * sandboxed iframe and speaks the exact MCP Apps postMessage JSON-RPC lifecycle
+ * a real host uses (`ui/initialize` handshake → `initialized` → tool-input /
+ * tool-result, plus `size-changed`-driven iframe sizing), so the component
+ * cannot tell the emulator from Claude/ChatGPT. Tool calls run against the same
+ * `/mcp` endpoint the real host would hit.
  */
 export function renderHostPage(opts: {
   appName: string;
@@ -18,12 +20,15 @@ export function renderHostPage(opts: {
     renderer: opts.renderer,
     components: opts.components,
     methods: {
-      ready: AppMethods.Ready,
+      initialize: HostMethods.Initialize,
       callTool: HostMethods.CallTool,
       requestDisplayMode: HostMethods.RequestDisplayMode,
-      sendFollowupPrompt: HostMethods.SendFollowupPrompt,
-      toolResult: AppNotifications.ToolResult,
-      theme: AppNotifications.Theme,
+      message: HostMethods.Message,
+      initialized: AppNotifications.Initialized,
+      sizeChanged: AppNotifications.SizeChanged,
+      toolResult: HostNotifications.ToolResult,
+      toolInput: HostNotifications.ToolInput,
+      hostContextChanged: HostNotifications.HostContextChanged,
     },
   });
 
@@ -48,8 +53,10 @@ export function renderHostPage(opts: {
   button.secondary { background: transparent; border: 1px solid #8885; color: inherit; }
   label { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #8889; }
   .field { display: flex; flex-direction: column; gap: 6px; }
+  /* Flexible frame: the iframe height is driven by ui/notifications/size-changed,
+     exactly like Claude. No fixed/min height — a 0-height regression is visible. */
   .frame { flex: 1; padding: 24px; background: #8881; overflow: auto; }
-  iframe { width: 100%; height: 100%; min-height: 400px; border: 1px solid #8884; border-radius: 12px; background: #fff; }
+  iframe { display: block; width: 100%; height: 0; border: 1px solid #8884; border-radius: 12px; background: #fff; }
   .log { border-top: 1px solid #8883; padding: 8px 16px; max-height: 160px; overflow: auto; font-family: ui-monospace, monospace; font-size: 12px; }
   .log div { white-space: pre-wrap; }
   .row { display: flex; gap: 8px; }
@@ -88,8 +95,10 @@ const M = CONFIG.methods;
 const $ = (id) => document.getElementById(id);
 let tools = [];
 let currentTool = null;
-let currentResult = null;
+let currentResult = null;   // { toolName, structuredContent, isError }
+let currentArgs = null;     // arguments the tool was invoked with
 let colorScheme = "light";
+let viewInitialized = false;
 
 function log(...args) {
   const el = document.createElement("div");
@@ -143,11 +152,40 @@ function selectTool(name) {
   $("args").value = JSON.stringify(sampleFromSchema(currentTool.inputSchema), null, 2);
 }
 
+function view() { return $("view").contentWindow; }
+
+/** Build the hostContext we hand the app in the ui/initialize response. */
+function hostContext() {
+  const frame = $("view").getBoundingClientRect();
+  const avail = document.querySelector(".frame").getBoundingClientRect();
+  return {
+    theme: colorScheme,
+    styles: { variables: {} },
+    displayMode: "inline",
+    containerDimensions: { width: Math.round(frame.width || avail.width), maxHeight: Math.round(avail.height) },
+    toolInfo: currentTool ? { tool: currentTool } : undefined,
+    locale: navigator.language,
+    platform: "web",
+  };
+}
+
+/** Push tool-input + tool-result to a freshly-initialized view. */
+function pushToolData() {
+  if (!viewInitialized) return;
+  if (currentArgs) {
+    view().postMessage({ jsonrpc: "2.0", method: M.toolInput, params: { arguments: currentArgs } }, "*");
+  }
+  if (currentResult) {
+    view().postMessage({ jsonrpc: "2.0", method: M.toolResult, params: currentResult }, "*");
+  }
+}
+
 async function invoke() {
   if (!currentTool) return;
   let args;
   try { args = JSON.parse($("args").value || "{}"); }
   catch (e) { log("Invalid JSON args:", e.message); return; }
+  currentArgs = args;
 
   $("status").textContent = "calling " + currentTool.name + "…";
   let result;
@@ -160,21 +198,24 @@ async function invoke() {
   const uri = currentTool._meta && currentTool._meta.ui && currentTool._meta.ui.resourceUri;
   if (!uri) { $("status").textContent = "tool has no UI"; return; }
 
-  const view = $("view");
+  // Re-mount the view; it will run ui/initialize and we push data on initialized.
+  viewInitialized = false;
+  const v = $("view");
+  v.style.height = "0";
   const bundled = CONFIG.components[uri];
   if (bundled && bundled.basePath) {
     // Asset-bundled (Flutter): load from a served URL so relative assets resolve.
-    view.removeAttribute("srcdoc");
-    view.setAttribute("sandbox", "allow-scripts allow-same-origin");
-    view.src = bundled.basePath;
-    $("status").textContent = "rendered (flutter) " + uri;
+    v.removeAttribute("srcdoc");
+    v.setAttribute("sandbox", "allow-scripts allow-same-origin");
+    v.src = bundled.basePath;
+    $("status").textContent = "loading (flutter) " + uri;
   } else {
     // Self-contained (Vue): inline the HTML via srcdoc in a strict sandbox.
     const read = await rpc("resources/read", { uri });
-    view.setAttribute("sandbox", "allow-scripts");
-    view.removeAttribute("src");
-    view.srcdoc = read.contents[0].text;
-    $("status").textContent = "rendered " + uri;
+    v.setAttribute("sandbox", "allow-scripts");
+    v.removeAttribute("src");
+    v.srcdoc = read.contents[0].text;
+    $("status").textContent = "loading " + uri;
   }
 }
 
@@ -182,33 +223,44 @@ async function invoke() {
 window.addEventListener("message", async (event) => {
   const msg = event.data;
   if (!msg || msg.jsonrpc !== "2.0") return;
-  const view = $("view").contentWindow;
 
-  // Notification from app.
-  if (msg.method === M.ready && msg.id === undefined) {
-    if (currentResult) {
-      view.postMessage({ jsonrpc: "2.0", method: M.toolResult, params: currentResult }, "*");
-      view.postMessage({ jsonrpc: "2.0", method: M.theme, params: { colorScheme, tokens: {} } }, "*");
+  // Notification from app (no id).
+  if (msg.id === undefined && msg.method) {
+    if (msg.method === M.initialized) {
+      viewInitialized = true;
+      $("status").textContent = "initialized";
+      pushToolData();
+    } else if (msg.method === M.sizeChanged) {
+      const h = msg.params && msg.params.height;
+      if (typeof h === "number") $("view").style.height = h + "px";
     }
     return;
   }
+
   // Request from app -> fulfil and respond.
   if (msg.id !== undefined) {
     try {
       let result = {};
-      if (msg.method === M.callTool) {
+      if (msg.method === M.initialize) {
+        result = {
+          protocolVersion: "2026-01-26",
+          hostInfo: { name: "mcpapps-emulator", version: "0.0.0" },
+          hostCapabilities: { serverTools: {}, serverResources: {} },
+          hostContext: hostContext(),
+        };
+      } else if (msg.method === M.callTool) {
         const r = await rpc("tools/call", msg.params);
         result = r;
         currentResult = { toolName: msg.params.name, structuredContent: r.structuredContent, isError: !!r.isError };
         log("app called tool:", msg.params.name);
       } else if (msg.method === M.requestDisplayMode) {
         log("app requested display mode:", msg.params && msg.params.mode);
-      } else if (msg.method === M.sendFollowupPrompt) {
-        log("app sent follow-up prompt:", msg.params && msg.params.prompt);
+      } else if (msg.method === M.message) {
+        log("app sent message:", msg.params && msg.params.content && msg.params.content.text);
       }
-      view.postMessage({ jsonrpc: "2.0", id: msg.id, result }, "*");
+      view().postMessage({ jsonrpc: "2.0", id: msg.id, result }, "*");
     } catch (e) {
-      view.postMessage({ jsonrpc: "2.0", id: msg.id, error: { code: -32603, message: e.message } }, "*");
+      view().postMessage({ jsonrpc: "2.0", id: msg.id, error: { code: -32603, message: e.message } }, "*");
     }
   }
 });
@@ -217,8 +269,9 @@ $("tool").addEventListener("change", (e) => selectTool(e.target.value));
 $("invoke").addEventListener("click", invoke);
 $("theme").addEventListener("click", () => {
   colorScheme = colorScheme === "light" ? "dark" : "light";
-  const view = $("view").contentWindow;
-  view && view.postMessage({ jsonrpc: "2.0", method: M.theme, params: { colorScheme, tokens: {} } }, "*");
+  if (viewInitialized) {
+    view().postMessage({ jsonrpc: "2.0", method: M.hostContextChanged, params: { theme: colorScheme, styles: { variables: {} } } }, "*");
+  }
   log("theme:", colorScheme);
 });
 

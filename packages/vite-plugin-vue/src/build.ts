@@ -1,6 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { CompiledComponent, UiResourceUri } from "@mcpapps/protocol";
+import type {
+  CompiledComponent,
+  McpUiPermissions,
+  McpUiResourceCsp,
+  UiResourceUri,
+} from "@mcpapps/protocol";
 import vue from "@vitejs/plugin-vue";
 import { build, type Plugin, type Rollup } from "vite";
 import { renderComponentHtml } from "./html.js";
@@ -27,7 +32,15 @@ function entryPlugin(componentPath: string): Plugin {
   };
 }
 
-export interface BuildVueComponentOptions {
+/** CSP/permissions/appearance hints emitted into the component's `_meta.ui`. */
+export interface ComponentAppearance {
+  csp?: McpUiResourceCsp;
+  permissions?: McpUiPermissions;
+  domain?: string;
+  prefersBorder?: boolean;
+}
+
+export interface BuildVueComponentOptions extends ComponentAppearance {
   /** Absolute path to the `.vue` entry component. */
   entry: string;
   /** The `ui://` URI this component is served at. */
@@ -81,10 +94,15 @@ export async function buildVueComponent(
   if (!js) throw new Error(`buildVueComponent produced no JS for ${opts.entry}`);
 
   const html = renderComponentHtml({ js, css, ...(opts.title ? { title: opts.title } : {}) });
-  return { uri: opts.uri, html };
+  const component: CompiledComponent = { uri: opts.uri, html };
+  if (opts.csp) component.csp = opts.csp;
+  if (opts.permissions) component.permissions = opts.permissions;
+  if (opts.domain) component.domain = opts.domain;
+  if (opts.prefersBorder !== undefined) component.prefersBorder = opts.prefersBorder;
+  return component;
 }
 
-export interface ComponentSpec {
+export interface ComponentSpec extends ComponentAppearance {
   /** Export name in the generated module (use a valid JS identifier). */
   name: string;
   entry: string;
@@ -109,6 +127,10 @@ export async function writeComponentsModule(
       ...(options.root ? { root: options.root } : {}),
       ...(options.minify !== undefined ? { minify: options.minify } : {}),
       ...(spec.title ? { title: spec.title } : {}),
+      ...(spec.csp ? { csp: spec.csp } : {}),
+      ...(spec.permissions ? { permissions: spec.permissions } : {}),
+      ...(spec.domain ? { domain: spec.domain } : {}),
+      ...(spec.prefersBorder !== undefined ? { prefersBorder: spec.prefersBorder } : {}),
     });
     built.push({ name: spec.name, component });
   }

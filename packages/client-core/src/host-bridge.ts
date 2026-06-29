@@ -1,36 +1,55 @@
 import {
-  AppMethods,
   AppNotifications,
   type CallToolParams,
   DEFAULT_THEME,
   type DisplayMode,
+  type HostContext,
   HostMethods,
+  HostNotifications,
+  type InitializeParams,
+  type InitializeResult,
   isJsonRpcNotification,
   isJsonRpcResponse,
   type JsonRpcId,
   type JsonRpcMessage,
   type JsonRpcRequest,
+  PROTOCOL_VERSION,
   type RequestDisplayModeParams,
-  type SendFollowupPromptParams,
+  type SizeChangedParams,
   type ThemeState,
+  type ToolInputParams,
   type ToolResultEnvelope,
+  type UiMessageParams,
 } from "@mcpapps/protocol";
 import { createPostMessageTransport, type Transport, type Unsubscribe } from "./transport.js";
 
+/** Identifies the app to the host in the `ui/initialize` handshake. */
+const CLIENT_INFO = { name: "@mcpapps/client-core", version: "0.0.0" } as const;
+
+/** How long to wait for the host's `ui/initialize` response before proceeding. */
+const INITIALIZE_TIMEOUT_MS = 2000;
+
 /**
  * The normalized host link both renderers (Vue, Flutter) sit on. It is the only
- * code in the framework that speaks JSON-RPC to the host, so the renderers never
- * diverge: they all consume tool results, theme, and tool calls through this.
+ * code in the framework that speaks the MCP Apps JSON-RPC lifecycle to the host,
+ * so the renderers never diverge: they all consume tool results, theme, and tool
+ * calls through this.
  */
 export interface HostBridge {
   /** Subscribe to tool results. Replays the latest result immediately if present. */
   onToolResult<TOutput = unknown>(cb: (env: ToolResultEnvelope<TOutput>) => void): Unsubscribe;
   /** Subscribe to theme changes. Replays the current theme immediately. */
   onTheme(cb: (theme: ThemeState) => void): Unsubscribe;
+  /** Subscribe to host-context changes (theme, container size, display mode, …). */
+  onHostContext(cb: (ctx: HostContext) => void): Unsubscribe;
+  /** Subscribe to the (complete) tool input. Replays the latest if present. */
+  onToolInput(cb: (args: Record<string, unknown>) => void): Unsubscribe;
   /** The most recent tool result, or null if none has arrived yet. */
   getLatestToolResult<TOutput = unknown>(): ToolResultEnvelope<TOutput> | null;
   /** The current theme (defaults to light until the host says otherwise). */
   getTheme(): ThemeState;
+  /** The latest host context received from the host, if any. */
+  getHostContext(): HostContext | null;
 
   /** Invoke a tool on the server and await its (normalized) result. */
   callTool<TArgs = unknown, TOutput = unknown>(
@@ -39,11 +58,18 @@ export interface HostBridge {
   ): Promise<ToolResultEnvelope<TOutput>>;
   /** Ask the host to change the display mode. */
   requestDisplayMode(mode: DisplayMode): Promise<void>;
-  /** Inject a follow-up prompt into the host conversation. */
-  sendFollowupPrompt(prompt: string): Promise<void>;
+  /** Send a user message (e.g. a follow-up prompt) into the host conversation. */
+  sendMessage(text: string): Promise<void>;
+  /** Report the rendered content size so the host can size a flexible iframe. */
+  reportSize(width: number, height: number): void;
 
-  /** Signal the host the app has mounted (flushes the host's queued result). */
-  ready(): void;
+  /**
+   * Run the `ui/initialize` handshake: send the request, seed theme/context from
+   * the response, then send `ui/notifications/initialized` (which unblocks the
+   * host's tool-input/tool-result notifications). Resolves with the host's
+   * response (or a minimal default if the host does not answer in time).
+   */
+  initialize(): Promise<InitializeResult>;
   /** Tear down: detach the transport and drop all subscribers. */
   dispose(): void;
 }
@@ -51,16 +77,22 @@ export interface HostBridge {
 export interface CreateHostBridgeOptions {
   /** Defaults to a postMessage transport to `window.parent`. */
   transport?: Transport;
+  /** Display modes the app supports; advertised in `ui/initialize`. */
+  availableDisplayModes?: DisplayMode[];
 }
 
 export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBridge {
   const transport = options.transport ?? createPostMessageTransport();
 
   let latestToolResult: ToolResultEnvelope | null = null;
+  let latestToolInput: Record<string, unknown> | null = null;
+  let hostContext: HostContext | null = null;
   let theme: ThemeState = DEFAULT_THEME;
 
   const toolResultSubs = new Set<(env: ToolResultEnvelope) => void>();
+  const toolInputSubs = new Set<(args: Record<string, unknown>) => void>();
   const themeSubs = new Set<(theme: ThemeState) => void>();
+  const hostContextSubs = new Set<(ctx: HostContext) => void>();
   const pending = new Map<
     JsonRpcId,
     { resolve: (value: unknown) => void; reject: (reason: Error) => void }
@@ -84,13 +116,18 @@ export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBri
     }
     if (isJsonRpcNotification(message)) {
       switch (message.method) {
-        case AppNotifications.ToolResult: {
+        case HostNotifications.ToolResult: {
           publishToolResult(normalizeToolResult(message.params));
           break;
         }
-        case AppNotifications.Theme: {
-          theme = (message.params as ThemeState) ?? DEFAULT_THEME;
-          for (const cb of themeSubs) cb(theme);
+        case HostNotifications.ToolInput:
+        case HostNotifications.ToolInputPartial: {
+          const params = (message.params ?? {}) as ToolInputParams;
+          publishToolInput(params.arguments ?? {});
+          break;
+        }
+        case HostNotifications.HostContextChanged: {
+          applyHostContext((message.params ?? {}) as HostContext);
           break;
         }
         default:
@@ -102,6 +139,21 @@ export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBri
   function publishToolResult(env: ToolResultEnvelope): void {
     latestToolResult = env;
     for (const cb of toolResultSubs) cb(env);
+  }
+
+  function publishToolInput(args: Record<string, unknown>): void {
+    latestToolInput = args;
+    for (const cb of toolInputSubs) cb(args);
+  }
+
+  /** Merge a (partial) host context, re-derive theme, and notify subscribers. */
+  function applyHostContext(ctx: HostContext): void {
+    hostContext = { ...(hostContext ?? {}), ...ctx };
+    if ("theme" in ctx || ctx.styles) {
+      theme = themeFromContext(hostContext);
+      for (const cb of themeSubs) cb(theme);
+    }
+    for (const cb of hostContextSubs) cb(hostContext);
   }
 
   function request<TResult>(method: string, params: unknown): Promise<TResult> {
@@ -120,16 +172,29 @@ export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBri
       if (latestToolResult) cb(latestToolResult as ToolResultEnvelope<TOutput>);
       return () => toolResultSubs.delete(typed);
     },
+    onToolInput(cb) {
+      toolInputSubs.add(cb);
+      if (latestToolInput) cb(latestToolInput);
+      return () => toolInputSubs.delete(cb);
+    },
     onTheme(cb) {
       themeSubs.add(cb);
       cb(theme);
       return () => themeSubs.delete(cb);
+    },
+    onHostContext(cb) {
+      hostContextSubs.add(cb);
+      if (hostContext) cb(hostContext);
+      return () => hostContextSubs.delete(cb);
     },
     getLatestToolResult<TOutput>() {
       return latestToolResult as ToolResultEnvelope<TOutput> | null;
     },
     getTheme() {
       return theme;
+    },
+    getHostContext() {
+      return hostContext;
     },
     async callTool<TArgs, TOutput>(name: string, args: TArgs) {
       const params: CallToolParams<TArgs> = { name, arguments: args };
@@ -144,21 +209,74 @@ export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBri
       const params: RequestDisplayModeParams = { mode };
       await request<unknown>(HostMethods.RequestDisplayMode, params);
     },
-    async sendFollowupPrompt(prompt) {
-      const params: SendFollowupPromptParams = { prompt };
-      await request<unknown>(HostMethods.SendFollowupPrompt, params);
+    async sendMessage(text) {
+      const params: UiMessageParams = { role: "user", content: { type: "text", text } };
+      await request<unknown>(HostMethods.Message, params);
     },
-    ready() {
-      transport.send({ jsonrpc: "2.0", method: AppMethods.Ready });
+    reportSize(width, height) {
+      const params: SizeChangedParams = { width: Math.round(width), height: Math.round(height) };
+      transport.send({ jsonrpc: "2.0", method: AppNotifications.SizeChanged, params });
+    },
+    async initialize() {
+      const params: InitializeParams = {
+        appCapabilities: options.availableDisplayModes
+          ? { availableDisplayModes: options.availableDisplayModes }
+          : {},
+        clientInfo: CLIENT_INFO,
+        protocolVersion: PROTOCOL_VERSION,
+      };
+      let result: InitializeResult;
+      try {
+        result = await withTimeout(
+          request<InitializeResult>(HostMethods.Initialize, params),
+          INITIALIZE_TIMEOUT_MS,
+        );
+      } catch {
+        // A host that doesn't implement ui/initialize (or is slow) still gets an
+        // `initialized` notification below so it can start pushing data.
+        result = { protocolVersion: PROTOCOL_VERSION };
+      }
+      if (result.hostContext) applyHostContext(result.hostContext);
+      transport.send({ jsonrpc: "2.0", method: AppNotifications.Initialized, params: {} });
+      return result;
     },
     dispose() {
       detach();
       transport.close();
       pending.clear();
       toolResultSubs.clear();
+      toolInputSubs.clear();
       themeSubs.clear();
+      hostContextSubs.clear();
     },
   };
+}
+
+/** Resolve `promise`, or reject after `ms` so the caller never hangs. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout")), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
+/** Derive the normalized theme from a host context's theme + style variables. */
+function themeFromContext(ctx: HostContext | null): ThemeState {
+  if (!ctx) return DEFAULT_THEME;
+  const tokens: Record<string, string> = {};
+  for (const [k, v] of Object.entries(ctx.styles?.variables ?? {})) {
+    if (typeof v === "string") tokens[k] = v;
+  }
+  return { colorScheme: ctx.theme ?? DEFAULT_THEME.colorScheme, tokens };
 }
 
 /**

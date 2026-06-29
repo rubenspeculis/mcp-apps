@@ -9,7 +9,16 @@ const weather = defineTool({
   description: "Current weather for a city",
   inputSchema: z.object({ city: z.string() }),
   outputSchema: z.object({ tempC: z.number(), condition: z.string() }),
-  ui: { uri: "ui://weather/get_weather", html: "<h1>weather</h1>" },
+  ui: {
+    uri: "ui://weather/get_weather",
+    html: "<h1>weather</h1>",
+    csp: {
+      connectDomains: ["https://api.example.com"],
+      resourceDomains: ["https://cdn.example.com"],
+    },
+    permissions: { clipboardWrite: {} },
+    prefersBorder: true,
+  },
   handler: ({ city }) => ({ tempC: city === "London" ? 12 : 25, condition: "Sunny" }),
 });
 
@@ -55,8 +64,23 @@ describe("createMcpHandler", () => {
     expect(tool.inputSchema.type).toBe("object");
     expect(tool.inputSchema.properties.city.type).toBe("string");
     expect(tool._meta.ui.resourceUri).toBe("ui://weather/get_weather");
+    // CSP / permissions surfaced under _meta.ui
+    expect(tool._meta.ui.csp.connectDomains).toEqual(["https://api.example.com"]);
+    expect(tool._meta.ui.permissions).toEqual({ clipboardWrite: {} });
+    expect(tool._meta.ui.prefersBorder).toBe(true);
     // compat mirror keys present
     expect(tool._meta["openai/outputTemplate"]).toBe("ui://weather/get_weather");
+    expect(tool._meta["openai/widgetCSP"].connect_domains).toEqual(["https://api.example.com"]);
+    expect(tool._meta["openai/widgetCSP"].resource_domains).toEqual(["https://cdn.example.com"]);
+  });
+
+  it("lists resources with the ui _meta block", async () => {
+    const res = await rpc(handler, { jsonrpc: "2.0", id: 7, method: "resources/list" });
+    const body = await res.json();
+    const resource = body.result.resources[0];
+    expect(resource.uri).toBe("ui://weather/get_weather");
+    expect(resource._meta.ui.resourceUri).toBe("ui://weather/get_weather");
+    expect(resource._meta.ui.csp.connectDomains).toEqual(["https://api.example.com"]);
   });
 
   it("calls a tool and returns structuredContent + ui meta", async () => {
@@ -92,6 +116,13 @@ describe("createMcpHandler", () => {
     const body = await res.json();
     expect(body.result.contents[0].mimeType).toBe(MCP_APP_MIME);
     expect(body.result.contents[0].text).toContain("weather");
+    // CSP travels on the resource content's _meta.ui (spec) + compat key.
+    expect(body.result.contents[0]._meta.ui.csp.connectDomains).toEqual([
+      "https://api.example.com",
+    ]);
+    expect(body.result.contents[0]._meta["openai/widgetCSP"].connect_domains).toEqual([
+      "https://api.example.com",
+    ]);
   });
 
   it("errors on an unknown method", async () => {
