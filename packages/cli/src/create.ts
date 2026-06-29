@@ -61,9 +61,13 @@ function findWorkspaceRoot(dir: string): string | null {
   return null;
 }
 
-/** Use `workspace:*` when scaffolding inside the @mcpapps monorepo, else a range. */
+/**
+ * Use `workspace:*` when scaffolding inside the @mcpapps monorepo, else a caret
+ * range on the CLI's own published version — so a `create-mcpapp@x.y.z` scaffolds
+ * `^x.y.z` and never drifts from what's actually on npm.
+ */
 function detectDep(dir: string): string {
-  return findWorkspaceRoot(dir) ? "workspace:*" : "^0.1.0";
+  return findWorkspaceRoot(dir) ? "workspace:*" : `^${cliVersion()}`;
 }
 
 /**
@@ -90,7 +94,11 @@ function detectBridgeDep(dir: string): string {
   ].join("\n");
 }
 
-/** The CLI's own published version, used to pin scaffolded git deps to a tag. */
+/**
+ * The CLI's own published version — used both for the scaffolded npm dep range
+ * and to pin the Flutter bridge git dep to its `v<version>` tag. Falls back to
+ * `0.1.0` for the unpublished `0.0.0` dev/bootstrap state.
+ */
 function cliVersion(): string {
   try {
     const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
