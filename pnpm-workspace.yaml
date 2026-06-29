@@ -70,6 +70,10 @@ allowBuilds:
 overrides:
   tmp: ">=0.2.7"
   js-yaml: ">=4.2.0"
+  # changesets' read-yaml-file@1 calls js-yaml's v3 `safeLoad`, removed in v4.
+  # Scope it back to the patched final v3 so the global v4 override above (kept
+  # for security elsewhere) doesn't break `changeset version`/`status`.
+  "read-yaml-file>js-yaml": "3.14.1"
   undici: ">=6.27.0"
   ws: ">=8.21.0"
   esbuild: ">=0.24.3"
