@@ -16,6 +16,12 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Disable lefthook git hooks for the whole job: the changesets action commits
+    # "Version Packages" (not a conventional message) and pushes tags, both of
+    # which would otherwise trip the commit-msg/pre-push hooks installed by the
+    # `prepare` script during `pnpm install`. CI gating happens in the PR check.
+    env:
+      LEFTHOOK: "0"
     steps:
       - uses: actions/checkout@v4
         with:
