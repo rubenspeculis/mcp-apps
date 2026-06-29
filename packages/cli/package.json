@@ -5,8 +5,8 @@
   "type": "module",
   "license": "MIT",
   "bin": {
-    "mcpapps": "./dist/cli.js",
-    "create-mcpapp": "./dist/create-bin.js"
+    "mcpapps": "./bin/mcpapps.mjs",
+    "create-mcpapp": "./bin/create-mcpapp.mjs"
   },
   "exports": {
     ".": {
@@ -17,6 +17,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
+    "bin",
     "dist"
   ],
   "scripts": {
