@@ -1,6 +1,6 @@
 {
   "name": "@mcpapps/typegen",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Generate typed Dart models from zod tool schemas (zod -> JSON Schema -> Dart).",
   "type": "module",
   "license": "MIT",

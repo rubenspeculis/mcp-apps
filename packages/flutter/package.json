@@ -1,6 +1,6 @@
 {
   "name": "@mcpapps/flutter",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Build a Flutter Web app into a ui:// MCP App component (loader HTML + cached assets).",
   "type": "module",
   "license": "MIT",

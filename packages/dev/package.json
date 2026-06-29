@@ -1,6 +1,6 @@
 {
   "name": "@mcpapps/dev",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Local host emulator, dev server and Cloudflare tunnel for MCP Apps.",
   "type": "module",
   "license": "MIT",

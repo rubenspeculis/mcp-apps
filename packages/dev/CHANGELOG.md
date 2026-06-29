@@ -1,5 +1,14 @@
 # @mcpapps/dev
 
+## 0.1.3
+
+### Patch Changes
+
+- Move zod
+- Updated dependencies
+  - @mcpapps/protocol@0.1.3
+  - @mcpapps/server@0.1.3
+
 ## 0.1.2
 
 ### Patch Changes

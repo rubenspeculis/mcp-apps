@@ -1,5 +1,14 @@
 # @mcpapps/vue
 
+## 0.1.3
+
+### Patch Changes
+
+- Move zod
+- Updated dependencies
+  - @mcpapps/client-core@0.1.3
+  - @mcpapps/protocol@0.1.3
+
 ## 0.1.2
 
 ### Patch Changes
