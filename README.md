@@ -57,9 +57,12 @@ edits appear instantly without losing state.
 
 Each app picks one renderer. **Vue** components are self-contained (tens of KB) and
 ideal for lightweight cards. **Flutter** components are richer but multi-megabyte
-(CanvasKit), so they are served as cached assets and loaded via iframe `src` rather than
-inlined `srcdoc` — best for stateful/graphical UIs. Both consume the *same* host bridge,
-so the server, emulator, and protocol are identical across them.
+(CanvasKit): the emulator can serve their asset bundle via iframe `src`, while deployed
+hosts usually receive one inlined HTML document (often rendered with `srcdoc`). Flutter is
+best for stateful/graphical UIs, and should use `McpAutoSize` for tall content plus
+`callTool`/`McpAppHttpClient` for backend calls from opaque-origin iframes. Both renderers
+consume the *same* host bridge, so the server, emulator, and protocol are identical across
+them.
 
 ## Create a new app
 
