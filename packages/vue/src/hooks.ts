@@ -5,7 +5,8 @@ import type { ResolveInput, ResolveOutput, ToolRegistry } from "./registry.js";
 
 /**
  * Reactive `structuredContent` of the latest tool result. Replays the existing
- * result on mount, then updates whenever the host pushes a new one.
+ * result on mount, then updates whenever the host pushes a new one. The bridge
+ * subscription is automatically removed when the component unmounts.
  *
  *   const data = useToolResult<"get_weather">(); // Ref<{ tempC: number } | null>
  */
@@ -37,7 +38,7 @@ export function useCallTool<R extends keyof ToolRegistry | string = string>(
   };
 }
 
-/** Reactive host theme (light/dark + tokens). */
+/** Reactive host theme (light/dark + tokens). Cleans up its bridge subscription on unmount. */
 export function useTheme(): Ref<ThemeState> {
   const bridge = injectBridge();
   const theme = ref<ThemeState>(bridge.getTheme() ?? DEFAULT_THEME);

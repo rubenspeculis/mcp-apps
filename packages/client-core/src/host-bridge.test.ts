@@ -153,6 +153,29 @@ describe("createHostBridge", () => {
     ).toBe(true);
   });
 
+  it("falls back and reports the initialise timeout", async () => {
+    const pair = createMockTransportPair();
+    const timeoutHost = makeHost(pair.host);
+    const onInitializeFallback = vi.fn();
+    const timedBridge = createHostBridge({
+      transport: pair.app,
+      initializeTimeoutMs: 1,
+      onInitializeFallback,
+    });
+
+    const result = await timedBridge.initialize();
+
+    expect(result.protocolVersion).toBe("2026-01-26");
+    expect(onInitializeFallback).toHaveBeenCalledWith(expect.any(Error));
+    expect(timeoutHost.requests[0]?.method).toBe(HostMethods.Initialize);
+    expect(
+      timeoutHost.notifications.some(
+        (m) => "method" in m && m.method === "ui/notifications/initialized",
+      ),
+    ).toBe(true);
+    timedBridge.dispose();
+  });
+
   it("reports size via ui/notifications/size-changed", async () => {
     bridge.reportSize(420, 260);
     await vi.waitFor(() =>

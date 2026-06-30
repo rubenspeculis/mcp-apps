@@ -10,5 +10,6 @@ coverage/
 .env.local
 *.log
 .dart_tool/
+packages/flutter_bridge/pubspec.lock
 .playwright-mcp/
 *.png

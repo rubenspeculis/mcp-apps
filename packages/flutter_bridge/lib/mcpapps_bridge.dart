@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
+import 'src/http_helpers.dart';
 
 /// The JSON bridge exposed on `window.mcpappsHost` by the `mcpapps-host.js`
 /// glue (which wraps @mcpapps/client-core). All payloads cross the JS<->Dart
@@ -136,7 +137,7 @@ class McpAppHttpClient extends http.BaseClient {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     final requestBytes = await request.finalize().toBytes();
-    final decodedBody = _decodeHttpBody(requestBytes);
+    final decodedBody = decodeMcpHttpBody(requestBytes);
     final args = await _buildArguments(request, decodedBody);
     final result =
         await controller.callTool(toolName, args) ?? <String, dynamic>{};
@@ -157,7 +158,7 @@ class McpAppHttpClient extends http.BaseClient {
   ) async {
     final custom = argumentsBuilder;
     if (custom != null) return await custom(request, decodedBody);
-    return _defaultHttpArguments(decodedBody);
+    return defaultMcpHttpArguments(decodedBody);
   }
 }
 
@@ -280,26 +281,6 @@ class _McpAutoSizeState extends State<McpAutoSize> {
     if (width != null && width.isFinite && width > 0) return width.ceil();
     return 360;
   }
-}
-
-Object? _decodeHttpBody(List<int> bytes) {
-  if (bytes.isEmpty) return null;
-  final text = utf8.decode(bytes);
-  if (text.trim().isEmpty) return null;
-  try {
-    return jsonDecode(text);
-  } catch (_) {
-    return text;
-  }
-}
-
-Map<String, dynamic> _defaultHttpArguments(Object? decodedBody) {
-  if (decodedBody == null) return <String, dynamic>{};
-  if (decodedBody is Map<String, dynamic>) return decodedBody;
-  if (decodedBody is Map) {
-    return decodedBody.map((key, value) => MapEntry(key.toString(), value));
-  }
-  return <String, dynamic>{'body': decodedBody};
 }
 
 /// Provides the [McpAppController] to the widget tree and rebuilds dependents

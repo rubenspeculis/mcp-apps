@@ -1,5 +1,5 @@
 import { PassThrough } from "node:stream";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { defineApp, defineTool } from "./define.js";
 import { serveStdio } from "./stdio.js";
@@ -38,6 +38,23 @@ describe("serveStdio", () => {
     const response = JSON.parse(await line);
     expect(response.id).toBe(1);
     expect(response.result.structuredContent).toEqual({ text: "hi" });
+  });
+
+  it("reports malformed JSON through an opt-in diagnostics hook", async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const onMalformedJson = vi.fn();
+    serveStdio(app, { input, output, onMalformedJson });
+
+    let wrote = false;
+    output.on("data", () => {
+      wrote = true;
+    });
+    input.write("{broken json\n");
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(wrote).toBe(false);
+    expect(onMalformedJson).toHaveBeenCalledWith("{broken json", expect.any(SyntaxError));
   });
 
   it("writes nothing for a notification", async () => {
