@@ -19,6 +19,12 @@ const component = await buildFlutterComponent({
 ```
 
 `fonts.gstatic.com` (Flutter's runtime Noto fallback) is declared in the component CSP by
-default; add more origins via the `csp` option. Requires the Flutter SDK on the build host.
+default; add more origins via the `csp` option. For inlined `srcdoc` hosts, route backend
+requests through `mcpapps_bridge` `callTool`/`McpAppHttpClient` rather than relying on direct
+browser fetch from Flutter's opaque-origin iframe.
+
+Tall Flutter UIs should use `mcpapps_bridge` `McpAutoSize` or call `reportSize` when their
+content changes; the initial viewport falls back to 480px when the host gives no dimensions.
+Requires the Flutter SDK on the build host.
 
 Part of [**mcp-apps**](https://github.com/rubenspeculis/mcp-apps).
