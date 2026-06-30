@@ -31,7 +31,7 @@ export function serveStdio(app: McpApp, options: ServeStdioOptions = {}): StdioS
     try {
       message = JSON.parse(trimmed) as JsonRpcMessage;
     } catch (err) {
-      options.onMalformedJson?.(trimmed, err);
+      reportMalformedJson(options, trimmed, err);
       return;
     }
     void processMessage(app, message).then((response) => {
@@ -40,4 +40,12 @@ export function serveStdio(app: McpApp, options: ServeStdioOptions = {}): StdioS
   });
 
   return { close: () => rl.close() };
+}
+
+function reportMalformedJson(options: ServeStdioOptions, line: string, error: unknown): void {
+  try {
+    options.onMalformedJson?.(line, error);
+  } catch {
+    // Diagnostics must never break the stdio transport.
+  }
 }
