@@ -1,5 +1,16 @@
 # @mcpapps/flutter
 
+## 0.1.4
+
+### Patch Changes
+
+- d132b03: Improve Flutter MCP components with Dart bridge helpers for tool-proxied HTTP,
+  tall-content sizing, and display-mode requests.
+
+  Document srcdoc networking, the Flutter height fallback, and strict tool outputs.
+
+  - @mcpapps/protocol@0.1.4
+
 ## 0.1.3
 
 ### Patch Changes

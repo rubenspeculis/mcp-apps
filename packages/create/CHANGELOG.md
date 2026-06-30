@@ -1,5 +1,12 @@
 # @mcpapps/create
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [d132b03]
+  - @mcpapps/cli@0.1.4
+
 ## 0.1.3
 
 ### Patch Changes
