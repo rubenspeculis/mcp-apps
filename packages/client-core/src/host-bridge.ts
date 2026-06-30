@@ -81,7 +81,7 @@ export interface CreateHostBridgeOptions {
   availableDisplayModes?: DisplayMode[];
   /** Override the `ui/initialize` response timeout. Defaults to 2000ms. */
   initializeTimeoutMs?: number;
-  /** Called when initialise times out or fails and the bridge falls back. */
+  /** Called when initialize times out or fails and the bridge falls back. */
   onInitializeFallback?: (error: Error) => void;
 }
 

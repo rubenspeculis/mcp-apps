@@ -153,7 +153,7 @@ describe("createHostBridge", () => {
     ).toBe(true);
   });
 
-  it("falls back and reports the initialise timeout", async () => {
+  it("falls back and reports the initialize timeout", async () => {
     const pair = createMockTransportPair();
     const timeoutHost = makeHost(pair.host);
     const onInitializeFallback = vi.fn();

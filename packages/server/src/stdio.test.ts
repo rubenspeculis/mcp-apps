@@ -51,10 +51,33 @@ describe("serveStdio", () => {
       wrote = true;
     });
     input.write("{broken json\n");
-    await new Promise((r) => setTimeout(r, 20));
 
+    await vi.waitFor(() =>
+      expect(onMalformedJson).toHaveBeenCalledWith("{broken json", expect.any(SyntaxError)),
+    );
     expect(wrote).toBe(false);
-    expect(onMalformedJson).toHaveBeenCalledWith("{broken json", expect.any(SyntaxError));
+  });
+
+  it("keeps serving when the malformed JSON diagnostics hook throws", async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    serveStdio(app, {
+      input,
+      output,
+      onMalformedJson: () => {
+        throw new Error("diagnostics failed");
+      },
+    });
+
+    input.write("{broken json\n");
+    const line = nextLine(output);
+    input.write(
+      `${JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "echo", arguments: { text: "after" } } })}\n`,
+    );
+
+    const response = JSON.parse(await line);
+    expect(response.id).toBe(2);
+    expect(response.result.structuredContent).toEqual({ text: "after" });
   });
 
   it("writes nothing for a notification", async () => {
