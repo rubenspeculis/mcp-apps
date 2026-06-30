@@ -27,7 +27,7 @@ import { createPostMessageTransport, type Transport, type Unsubscribe } from "./
 const CLIENT_INFO = { name: "@mcpapps/client-core", version: "0.0.0" } as const;
 
 /** How long to wait for the host's `ui/initialize` response before proceeding. */
-const INITIALIZE_TIMEOUT_MS = 2000;
+const DEFAULT_INITIALIZE_TIMEOUT_MS = 2000;
 
 /**
  * The normalized host link both renderers (Vue, Flutter) sit on. It is the only
@@ -79,6 +79,10 @@ export interface CreateHostBridgeOptions {
   transport?: Transport;
   /** Display modes the app supports; advertised in `ui/initialize`. */
   availableDisplayModes?: DisplayMode[];
+  /** Override the `ui/initialize` response timeout. Defaults to 2000ms. */
+  initializeTimeoutMs?: number;
+  /** Called when initialise times out or fails and the bridge falls back. */
+  onInitializeFallback?: (error: Error) => void;
 }
 
 export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBridge {
@@ -95,7 +99,11 @@ export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBri
   const hostContextSubs = new Set<(ctx: HostContext) => void>();
   const pending = new Map<
     JsonRpcId,
-    { resolve: (value: unknown) => void; reject: (reason: Error) => void }
+    {
+      resolve: (value: unknown) => void;
+      reject: (reason: Error) => void;
+      timer?: ReturnType<typeof setTimeout>;
+    }
   >();
 
   let nextId = 1;
@@ -107,6 +115,7 @@ export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBri
       const entry = pending.get(message.id ?? -1);
       if (!entry) return;
       pending.delete(message.id ?? -1);
+      if (entry.timer) clearTimeout(entry.timer);
       if ("error" in message) {
         entry.reject(new Error(message.error.message));
       } else {
@@ -156,11 +165,22 @@ export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBri
     for (const cb of hostContextSubs) cb(hostContext);
   }
 
-  function request<TResult>(method: string, params: unknown): Promise<TResult> {
+  function request<TResult>(method: string, params: unknown, timeoutMs?: number): Promise<TResult> {
     const id = nextId++;
     const message: JsonRpcRequest = { jsonrpc: "2.0", id, method, params };
     return new Promise<TResult>((resolve, reject) => {
-      pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
+      const entry: {
+        resolve: (value: unknown) => void;
+        reject: (reason: Error) => void;
+        timer?: ReturnType<typeof setTimeout>;
+      } = { resolve: resolve as (v: unknown) => void, reject };
+      if (timeoutMs !== undefined) {
+        entry.timer = setTimeout(() => {
+          pending.delete(id);
+          reject(new Error(`${method} timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }
+      pending.set(id, entry);
       transport.send(message);
     });
   }
@@ -227,13 +247,16 @@ export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBri
       };
       let result: InitializeResult;
       try {
-        result = await withTimeout(
-          request<InitializeResult>(HostMethods.Initialize, params),
-          INITIALIZE_TIMEOUT_MS,
+        result = await request<InitializeResult>(
+          HostMethods.Initialize,
+          params,
+          options.initializeTimeoutMs ?? DEFAULT_INITIALIZE_TIMEOUT_MS,
         );
-      } catch {
+      } catch (err) {
         // A host that doesn't implement ui/initialize (or is slow) still gets an
         // `initialized` notification below so it can start pushing data.
+        const error = err instanceof Error ? err : new Error("ui/initialize failed");
+        reportInitializeFallback(error);
         result = { protocolVersion: PROTOCOL_VERSION };
       }
       if (result.hostContext) applyHostContext(result.hostContext);
@@ -243,6 +266,9 @@ export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBri
     dispose() {
       detach();
       transport.close();
+      for (const entry of pending.values()) {
+        if (entry.timer) clearTimeout(entry.timer);
+      }
       pending.clear();
       toolResultSubs.clear();
       toolInputSubs.clear();
@@ -250,23 +276,14 @@ export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBri
       hostContextSubs.clear();
     },
   };
-}
 
-/** Resolve `promise`, or reject after `ms` so the caller never hangs. */
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("timeout")), ms);
-    promise.then(
-      (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(timer);
-        reject(e);
-      },
-    );
-  });
+  function reportInitializeFallback(error: Error): void {
+    if (options.onInitializeFallback) {
+      options.onInitializeFallback(error);
+      return;
+    }
+    console.warn(`@mcpapps/client-core: ui/initialize fallback: ${error.message}`);
+  }
 }
 
 /** Derive the normalized theme from a host context's theme + style variables. */

@@ -6,6 +6,8 @@ import { processMessage } from "./mcp-handler.js";
 export interface ServeStdioOptions {
   input?: NodeJS.ReadableStream;
   output?: NodeJS.WritableStream;
+  /** Optional diagnostics hook for malformed input. Never writes to stdout. */
+  onMalformedJson?: (line: string, error: unknown) => void;
 }
 
 export interface StdioServer {
@@ -28,8 +30,9 @@ export function serveStdio(app: McpApp, options: ServeStdioOptions = {}): StdioS
     let message: JsonRpcMessage;
     try {
       message = JSON.parse(trimmed) as JsonRpcMessage;
-    } catch {
-      return; // ignore malformed lines
+    } catch (err) {
+      options.onMalformedJson?.(trimmed, err);
+      return;
     }
     void processMessage(app, message).then((response) => {
       if (response) output.write(`${JSON.stringify(response)}\n`);
