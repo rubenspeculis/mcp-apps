@@ -22,13 +22,14 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "typecheck": "turbo typecheck",
-    "check": "biome ci . && turbo typecheck test",
+    "check": "biome ci . && turbo typecheck && turbo test -- --coverage",
     "codegen": "turbo codegen",
     "clean": "turbo clean && rm -rf .turbo",
     "clean:full": "pnpm clean && rm -rf node_modules **/node_modules",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "ship": "pnpm check && turbo build && pnpm -r publish --access public --no-git-checks",
+    "audit:examples": "pnpm --filter @mcpapps/example-weather-vue exec mcpapps audit --static-only && pnpm --filter @mcpapps/example-weather-flutter exec mcpapps audit --static-only",
+    "ship": "pnpm check && turbo build && pnpm audit:examples && pnpm -r publish --access public --no-git-checks",
     "prepare": "lefthook install"
   },
   "devDependencies": {
