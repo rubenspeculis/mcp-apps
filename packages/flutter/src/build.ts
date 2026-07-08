@@ -36,6 +36,15 @@ export interface BuildFlutterComponentOptions {
   /** Run `flutter pub get` before building. Default true. */
   pubGet?: boolean;
   /**
+   * Fold `fonts.gstatic.com` into the emitted CSP (default `true`). This only
+   * controls whether the CSP *declares* the origin — Flutter's runtime still
+   * tries to fetch Noto fallback glyphs from it regardless. Set `false` only
+   * if the app bundles complete fonts and wants zero third-party runtime
+   * origins; glyphs outside the bundled font (symbols, emoji, CJK) will then
+   * fail to render under the host's CSP.
+   */
+  includeFontCdn?: boolean;
+  /**
    * Produce a single self-contained HTML document (all assets inlined) instead
    * of an `assets` map + `basePath`. Required for hosts (Claude) that only serve
    * a single `text/html;profile=mcp-app` resource with no sibling files.
@@ -98,11 +107,19 @@ export async function buildFlutterComponent(
     assets["index.html"] = { body: html, mimeType: "text/html" };
     component = { uri: opts.uri, html, assets, basePath };
   }
-  component.csp = withFlutterFontCsp(opts.csp);
+  component.csp = resolveComponentCsp(opts.includeFontCdn, opts.csp);
   if (opts.permissions) component.permissions = opts.permissions;
   if (opts.domain) component.domain = opts.domain;
   if (opts.prefersBorder !== undefined) component.prefersBorder = opts.prefersBorder;
   return component;
+}
+
+/** The `component.csp` a build produces — extracted so `includeFontCdn` is unit-testable. */
+export function resolveComponentCsp(
+  includeFontCdn: boolean | undefined,
+  csp: McpUiResourceCsp | undefined,
+): McpUiResourceCsp {
+  return includeFontCdn === false ? (csp ?? {}) : withFlutterFontCsp(csp);
 }
 
 /** Origin Flutter web fetches Noto fallback fonts from at runtime. */
