@@ -3,5 +3,6 @@
  * wire contract. Pure types and constants; zero runtime dependencies.
  */
 export * from "./constants.js";
+export * from "./host-profiles.js";
 export * from "./jsonrpc.js";
 export * from "./messages.js";
