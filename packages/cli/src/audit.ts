@@ -83,10 +83,12 @@ function cspBucketsForHost(host: HostId): (typeof CSP_BUCKETS)[number][] {
  * leading `*.` wildcard label (`https://*.example.com`) — matching the shape
  * `originAllowed` below actually knows how to match. Rejects bare `"*"`,
  * scheme-only strings, `data:`, and CSP keyword literals like `'unsafe-inline'`,
- * which previously passed the shape check as "a string in an array".
+ * which previously passed the shape check as "a string in an array". Compared
+ * case-insensitively (scheme/host are case-insensitive per RFC 3986) against
+ * `URL.origin`, which WHATWG normalizes to lowercase.
  */
 function isValidCspOrigin(value: string): boolean {
-  const probe = value.replace(/^(https?:\/\/)\*\./, "$1wildcard.");
+  const probe = value.replace(/^(https?:\/\/)\*\./i, "$1wildcard.");
   let url: URL;
   try {
     url = new URL(probe);
@@ -95,7 +97,7 @@ function isValidCspOrigin(value: string): boolean {
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return false;
   if (!url.hostname) return false;
-  return probe === url.origin;
+  return probe.toLowerCase() === url.origin;
 }
 
 /**
