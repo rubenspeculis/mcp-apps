@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { HOST_PROFILES, type HostId } from "@mcpapps/protocol";
 import { parseArgs } from "./args.js";
 import { generatedPath, jitiFor, loadConfig, specsFor } from "./commands.js";
 import type { McpAppConfig, McpUiResourceCsp } from "./config.js";
@@ -49,17 +50,53 @@ interface PwModule {
   chromium: { launch: () => Promise<PwBrowser> };
 }
 
-type CheckStatus = "pass" | "fail" | "warn" | "skip";
-interface Check {
+export type CheckStatus = "pass" | "fail" | "warn" | "skip";
+export interface Check {
   label: string;
   status: CheckStatus;
   detail?: string;
 }
 
 const ICON: Record<CheckStatus, string> = { pass: "✓", fail: "✗", warn: "!", skip: "·" };
-const CSP_BUCKETS = ["connectDomains", "resourceDomains", "frameDomains", "baseUriDomains"];
+const CSP_BUCKETS = [
+  "connectDomains",
+  "resourceDomains",
+  "frameDomains",
+  "baseUriDomains",
+] as const;
 const TOOL_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 const UI_URI_RE = /^ui:\/\/.+/;
+const HOST_IDS: HostId[] = ["claude", "chatgpt"];
+
+/**
+ * CSP buckets a given host actually enforces from `_meta.ui.csp`. Claude
+ * consumes all four; a vendor host only honors the buckets its `cspKeyMap`
+ * mirrors (today: ChatGPT drops `frameDomains`/`baseUriDomains`).
+ */
+function cspBucketsForHost(host: HostId): (typeof CSP_BUCKETS)[number][] {
+  if (host === "claude") return [...CSP_BUCKETS];
+  return Object.keys(HOST_PROFILES[host].cspKeyMap) as (typeof CSP_BUCKETS)[number][];
+}
+
+/**
+ * A declared CSP origin must be an absolute `http(s)` URL, optionally with a
+ * leading `*.` wildcard label (`https://*.example.com`) — matching the shape
+ * `originAllowed` below actually knows how to match. Rejects bare `"*"`,
+ * scheme-only strings, `data:`, and CSP keyword literals like `'unsafe-inline'`,
+ * which previously passed the shape check as "a string in an array".
+ */
+function isValidCspOrigin(value: string): boolean {
+  const probe = value.replace(/^(https?:\/\/)\*\./, "$1wildcard.");
+  let url: URL;
+  try {
+    url = new URL(probe);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  if (!url.hostname) return false;
+  return probe === url.origin;
+}
 
 /**
  * `mcpapps audit [--static-only] [--runtime] [--port N]` — a skybridge-style
@@ -73,6 +110,14 @@ export async function auditCommand(argv: string[]): Promise<void> {
   const staticOnly = flags["static-only"] === true;
   const forceRuntime = flags.runtime === true;
   const port = typeof flags.port === "string" ? Number(flags.port) : undefined;
+
+  const hostFlag = typeof flags.host === "string" ? flags.host : "all";
+  if (hostFlag !== "all" && !HOST_IDS.includes(hostFlag as HostId)) {
+    console.error(`Unknown --host "${hostFlag}" (expected ${HOST_IDS.join("|")}|all)`);
+    process.exitCode = 1;
+    return;
+  }
+  const targetHosts: HostId[] = hostFlag === "all" ? HOST_IDS : [hostFlag as HostId];
 
   const cwd = process.cwd();
   const hasConfig = existsSync(resolve(cwd, "mcpapps.config.ts"));
@@ -97,13 +142,13 @@ export async function auditCommand(argv: string[]): Promise<void> {
   const appEntry = config ? resolve(cwd, config.app) : workerEntry;
   const app = await loadApp(appEntry, jiti, checks);
   if (app) {
-    staticToolChecks(app, checks);
+    staticToolChecks(app, checks, targetHosts);
     if (isFlutterProject) flutterArtifactChecks(cwd, checks);
   }
 
   // --- Layer B: headless-browser runtime conformance ---
   if (app && !staticOnly) {
-    await runtimeChecks(cwd, jiti, config, app, { port, forceRuntime, checks });
+    await runtimeChecks(cwd, jiti, config, app, { port, forceRuntime, targetHosts, checks });
   } else if (staticOnly) {
     checks.push({ label: "runtime: skipped (--static-only)", status: "skip" });
   }
@@ -112,7 +157,7 @@ export async function auditCommand(argv: string[]): Promise<void> {
 }
 
 /** Flutter has no central config — verify the build wiring instead. */
-function flutterArtifactChecks(cwd: string, checks: Check[]): void {
+export function flutterArtifactChecks(cwd: string, checks: Check[]): void {
   const meta = existsSync(resolve(cwd, "src/generated/component-meta.ts"));
   checks.push({
     label: "flutter: generated/component-meta.ts",
@@ -121,7 +166,7 @@ function flutterArtifactChecks(cwd: string, checks: Check[]): void {
   });
 }
 
-function staticConfigChecks(config: McpAppConfig, cwd: string, checks: Check[]): void {
+export function staticConfigChecks(config: McpAppConfig, cwd: string, checks: Check[]): void {
   if (config.renderer === "vue" || config.renderer === "flutter") {
     checks.push({ label: `config: renderer "${config.renderer}"`, status: "pass" });
   } else {
@@ -156,11 +201,18 @@ function staticConfigChecks(config: McpAppConfig, cwd: string, checks: Check[]):
   }
 }
 
-/** CSP must only use the four supported buckets, each an array of origin strings. */
-function cspShapeCheck(scope: string, csp: McpUiResourceCsp | undefined, checks: Check[]): void {
+/**
+ * CSP must only use the four supported buckets, each an array of syntactically
+ * valid origin strings (an absolute http(s) URL, optionally `*.`-wildcarded).
+ */
+export function cspShapeCheck(
+  scope: string,
+  csp: McpUiResourceCsp | undefined,
+  checks: Check[],
+): void {
   if (!csp) return;
   for (const [key, value] of Object.entries(csp)) {
-    if (!CSP_BUCKETS.includes(key)) {
+    if (!CSP_BUCKETS.includes(key as (typeof CSP_BUCKETS)[number])) {
       checks.push({
         label: `${scope}: csp`,
         status: "fail",
@@ -174,11 +226,20 @@ function cspShapeCheck(scope: string, csp: McpUiResourceCsp | undefined, checks:
         status: "fail",
         detail: "must be an array of origin strings",
       });
+      continue;
+    }
+    const invalid = value.filter((v: string) => !isValidCspOrigin(v));
+    if (invalid.length) {
+      checks.push({
+        label: `${scope}: csp.${key}`,
+        status: "fail",
+        detail: `invalid origin(s): ${invalid.map((v) => `"${v}"`).join(", ")} (expected an absolute http(s) origin, optionally "*."-wildcarded)`,
+      });
     }
   }
 }
 
-async function loadApp(
+export async function loadApp(
   entry: string,
   jiti: ReturnType<typeof jitiFor>,
   checks: Check[],
@@ -197,7 +258,11 @@ async function loadApp(
   }
 }
 
-function staticToolChecks(app: LoadedApp, checks: Check[]): void {
+export function staticToolChecks(
+  app: LoadedApp,
+  checks: Check[],
+  targetHosts: HostId[] = HOST_IDS,
+): void {
   const tools = app.tools ?? [];
   if (tools.length === 0) {
     checks.push({ label: "tools: at least one", status: "fail", detail: "app defines no tools" });
@@ -231,6 +296,27 @@ function staticToolChecks(app: LoadedApp, checks: Check[]): void {
         });
       }
       cspShapeCheck(`tool ${t.name}`, t.ui.csp, checks);
+
+      if (targetHosts.includes("claude") && t.ui.basePath && !t.ui.html && !t.ui.htmlAsset) {
+        checks.push({
+          label: `claude: tool ${t.name}: ui body`,
+          status: "fail",
+          detail:
+            "Claude serves a single self-contained resource with no sibling assets — a basePath-only component (no html/htmlAsset) cannot be delivered",
+        });
+      }
+      if (targetHosts.includes("chatgpt")) {
+        const undropped = (["frameDomains", "baseUriDomains"] as const).filter(
+          (bucket) => (t.ui?.csp?.[bucket]?.length ?? 0) > 0,
+        );
+        if (undropped.length) {
+          checks.push({
+            label: `chatgpt: tool ${t.name}: csp`,
+            status: "warn",
+            detail: `${undropped.join(", ")} declared but not mirrored to ChatGPT's widget CSP (no known equivalent bucket)`,
+          });
+        }
+      }
     }
     const ok =
       TOOL_NAME_RE.test(t.name ?? "") &&
@@ -244,6 +330,7 @@ function staticToolChecks(app: LoadedApp, checks: Check[]): void {
 interface RuntimeOpts {
   port: number | undefined;
   forceRuntime: boolean;
+  targetHosts: HostId[];
   checks: Check[];
 }
 
@@ -258,7 +345,7 @@ async function runtimeChecks(
   jiti: ReturnType<typeof jitiFor>,
   config: McpAppConfig | undefined,
   app: LoadedApp,
-  { port, forceRuntime, checks }: RuntimeOpts,
+  { port, forceRuntime, targetHosts, checks }: RuntimeOpts,
 ): Promise<void> {
   // Playwright is an optional dependency so static audit never pulls a browser.
   // A non-literal specifier keeps it out of the type graph and the bundle.
@@ -293,7 +380,7 @@ async function runtimeChecks(
   try {
     for (const tool of app.tools ?? []) {
       if (!tool.ui) continue;
-      await auditToolInBrowser(browser, emulator.url, tool, checks);
+      await auditToolInBrowser(browser, emulator.url, tool, targetHosts, checks);
     }
   } finally {
     await browser.close();
@@ -353,12 +440,15 @@ async function auditToolInBrowser(
   browser: PwBrowser,
   url: string,
   tool: ToolLike,
+  targetHosts: HostId[],
   checks: Check[],
 ): Promise<void> {
-  const declared = new Set([
-    ...(tool.ui?.csp?.connectDomains ?? []),
-    ...(tool.ui?.csp?.resourceDomains ?? []),
-  ]);
+  // Union the CSP buckets every targeted host actually enforces — e.g. a
+  // ChatGPT-only run doesn't treat frameDomains/baseUriDomains as declared,
+  // matching what its client would enforce; a Claude run treats all four as
+  // declared, since Claude has no dropped-bucket problem.
+  const enforcedBuckets = new Set(targetHosts.flatMap((h) => cspBucketsForHost(h)));
+  const declared = new Set([...enforcedBuckets].flatMap((bucket) => tool.ui?.csp?.[bucket] ?? []));
   const undeclared = new Set<string>();
   const page = await browser.newPage();
   if (process.env.AUDIT_DEBUG) {
