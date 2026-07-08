@@ -25,9 +25,6 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      # Playwright is not in pnpm's allowBuilds, so its browser is NOT downloaded
-      # here — the core gate stays fast. Runtime audit (mcpapps audit) installs
-      # chromium on demand; the static audit below needs no browser.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -43,3 +40,19 @@ jobs:
         run: |
           pnpm --filter @mcpapps/example-weather-vue exec mcpapps audit --static-only
           pnpm --filter @mcpapps/example-weather-flutter exec mcpapps audit --static-only
+
+      # The runtime layer (lifecycle handshake, CSP-drift detection) is the
+      # audit's most host-realistic check, so it's exercised here too — just
+      # against weather-vue, since Flutter's runtime path needs a pre-built app
+      # + toolchain this job doesn't have.
+      - name: Install Playwright chromium
+        run: pnpm --filter @mcpapps/cli exec playwright install --with-deps chromium
+
+      - name: Audit examples (runtime)
+        run: pnpm --filter @mcpapps/example-weather-vue exec mcpapps audit --runtime
+
+      # inline.browser.test.ts skips (not fails) in `pnpm check` above, since
+      # chromium isn't installed yet at that point — re-run it now so it
+      # actually executes in CI instead of always skipping.
+      - name: Flutter real-browser test
+        run: pnpm --filter @mcpapps/flutter test
