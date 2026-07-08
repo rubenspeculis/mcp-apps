@@ -9,7 +9,13 @@
     "lint": {},
     "codegen": { "cache": false },
     "clean": { "cache": false },
-    "@mcpapps/example-weather-vue#build": { "dependsOn": ["^build"], "outputs": [] },
-    "@mcpapps/example-weather-flutter#build": { "dependsOn": ["^build"], "outputs": [] }
+    "@mcpapps/example-weather-vue#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["src/generated/**"]
+    },
+    "@mcpapps/example-weather-flutter#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["src/generated/**"]
+    }
   }
 }

@@ -80,6 +80,12 @@ describe("cspShapeCheck", () => {
     cspShapeCheck("scope", { connectDomains: ["https://*.example.com"] }, checks);
     expect(checks).toEqual([]);
   });
+
+  it("accepts an origin with non-lowercase scheme/host", () => {
+    const checks: Check[] = [];
+    cspShapeCheck("scope", { connectDomains: ["https://API.Example.com"] }, checks);
+    expect(checks).toEqual([]);
+  });
 });
 
 describe("staticConfigChecks", () => {
