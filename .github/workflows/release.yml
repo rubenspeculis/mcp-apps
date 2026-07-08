@@ -23,18 +23,18 @@ jobs:
     env:
       LEFTHOOK: "0"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # full history so changesets can read tags
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       # No `registry-url`: it writes an .npmrc auth placeholder that interferes
       # with OIDC. pnpm publishes to the default npm registry and authenticates
       # via the workflow's OIDC identity (Trusted Publishing).
       - name: Install Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
