@@ -44,6 +44,10 @@ function makeHost(transport: Transport) {
         error: { code: -32603, message },
       } as JsonRpcMessage);
     },
+    /** Send an arbitrary (possibly malformed) notification, bypassing the typed helpers above. */
+    sendRawNotification(method: string, params: unknown) {
+      transport.send({ jsonrpc: "2.0", method, params } as JsonRpcMessage);
+    },
   };
 }
 
@@ -153,6 +157,29 @@ describe("createHostBridge", () => {
     ).toBe(true);
   });
 
+  it("still initializes but reports a protocolVersion mismatch from the host", async () => {
+    const pair = createMockTransportPair();
+    const mismatchHost = makeHost(pair.host);
+    const onInitializeFallback = vi.fn();
+    const mismatchBridge = createHostBridge({ transport: pair.app, onInitializeFallback });
+
+    const done = mismatchBridge.initialize();
+    await vi.waitFor(() => expect(mismatchHost.requests).toHaveLength(1));
+    mismatchHost.respond(mismatchHost.requests[0]?.id as number, {
+      protocolVersion: "1999-01-01",
+      hostContext: { theme: "dark" },
+    });
+    const result = await done;
+
+    expect(result.protocolVersion).toBe("1999-01-01");
+    expect(onInitializeFallback).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining("incompatible protocolVersion") }),
+    );
+    // Degrades gracefully rather than refusing to initialize.
+    expect(mismatchBridge.getTheme().colorScheme).toBe("dark");
+    mismatchBridge.dispose();
+  });
+
   it("falls back and reports the initialize timeout", async () => {
     const pair = createMockTransportPair();
     const timeoutHost = makeHost(pair.host);
@@ -174,6 +201,25 @@ describe("createHostBridge", () => {
       ),
     ).toBe(true);
     timedBridge.dispose();
+  });
+
+  it("drops a malformed tool-input notification instead of publishing garbage", async () => {
+    const seen = vi.fn();
+    bridge.onToolInput(seen);
+    // Missing `arguments` entirely — not the shape ToolInputParams requires.
+    host.sendRawNotification(HostNotifications.ToolInput, {});
+    // Give the (async) mock transport a tick to deliver, then assert nothing published.
+    await new Promise((r) => setTimeout(r, 10));
+    expect(seen).not.toHaveBeenCalled();
+  });
+
+  it("drops a malformed host-context-changed notification instead of corrupting theme state", async () => {
+    const before = bridge.getTheme().colorScheme;
+    host.sendRawNotification(HostNotifications.HostContextChanged, {
+      theme: "not-a-real-theme",
+    });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(bridge.getTheme().colorScheme).toBe(before);
   });
 
   it("reports size via ui/notifications/size-changed", async () => {

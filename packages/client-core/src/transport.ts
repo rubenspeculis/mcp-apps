@@ -21,6 +21,12 @@ export interface Transport {
 export function createPostMessageTransport(options?: {
   target?: Window;
   targetOrigin?: string;
+  /**
+   * Reject inbound messages whose `event.origin` doesn't match. Opt-in
+   * (default: any origin) because a sandboxed `srcdoc` host has an opaque
+   * (`"null"`) origin — pinning one by default would break that case.
+   */
+  expectedOrigin?: string;
 }): Transport {
   if (typeof window === "undefined") {
     throw new Error(
@@ -29,9 +35,13 @@ export function createPostMessageTransport(options?: {
   }
   const target = options?.target ?? window.parent;
   const targetOrigin = options?.targetOrigin ?? "*";
+  const expectedOrigin = options?.expectedOrigin;
   const handlers = new Set<(message: JsonRpcMessage) => void>();
 
   const onWindowMessage = (event: MessageEvent) => {
+    // Free and always safe: only the window we'd send to can be our host.
+    if (event.source !== target) return;
+    if (expectedOrigin !== undefined && event.origin !== expectedOrigin) return;
     const data = event.data as unknown;
     if (!isLikelyJsonRpc(data)) return;
     for (const handler of handlers) handler(data as JsonRpcMessage);
