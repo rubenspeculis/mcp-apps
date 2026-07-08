@@ -1,5 +1,8 @@
 import {
   type CompiledComponent,
+  HOST_PROFILES,
+  type HostId,
+  type HostProfile,
   type JsonRpcError,
   JsonRpcErrorCode,
   type JsonRpcMessage,
@@ -8,14 +11,25 @@ import {
   MCP_APP_MIME,
   type McpUiResourceCsp,
 } from "@mcpapps/protocol";
-import type { AnyToolDefinition, McpApp } from "./define.js";
+import type { AnyToolDefinition, AppDefinition, McpApp } from "./define.js";
 
-/** MCP protocol version this server speaks (echoes the client's if compatible). */
+/**
+ * Base MCP transport version this server speaks — a different axis from
+ * `@mcpapps/protocol`'s `PROTOCOL_VERSION` (the MCP Apps UI-extension version
+ * used in the `ui/initialize` iframe handshake). Requests must match exactly;
+ * unsupported versions are rejected rather than echoed back.
+ */
 export const SUPPORTED_PROTOCOL_VERSION = "2025-06-18";
 
 export interface McpHandlerOptions {
-  /** Add permissive CORS headers (useful for the browser emulator). Default true. */
-  cors?: boolean;
+  /** Add CORS headers. `true` = permissive `*` (default). `{ origin }` = allowlist. */
+  cors?: boolean | { origin: string | string[] };
+  /**
+   * Gate every non-preflight request. Return `false` (or throw) to reject with
+   * a `401`. Runs after OPTIONS preflight (which must always succeed) and
+   * before any body parsing or dispatch.
+   */
+  authorize?: (request: Request) => boolean | Promise<boolean>;
   /**
    * Resolve a component's HTML at `resources/read` time. Lets a host serve a
    * large self-contained document from a static asset (via `component.htmlAsset`)
@@ -33,25 +47,53 @@ export type FetchHandler = (request: Request) => Promise<Response>;
  * the Web Fetch API exists (Workers, Bun, Deno, Node via @hono/node-server).
  */
 export function createMcpHandler(app: McpApp, options: McpHandlerOptions = {}): FetchHandler {
-  const cors = options.cors ?? true;
-  const corsHeaders: Record<string, string> = cors
-    ? {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Mcp-Session-Id, Mcp-Protocol-Version",
-      }
-    : {};
+  const corsConfig = options.cors ?? true;
 
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+  // Origin allowlisting depends on the incoming request's `Origin` header, so
+  // headers are computed per-request rather than once at handler-creation time.
+  function buildCorsHeaders(request: Request): Record<string, string> {
+    if (corsConfig === false) return {};
+    const base = {
+      "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Mcp-Session-Id, Mcp-Protocol-Version",
+    };
+    if (corsConfig === true) {
+      return { ...base, "Access-Control-Allow-Origin": "*" };
+    }
+    const allowed = Array.isArray(corsConfig.origin) ? corsConfig.origin : [corsConfig.origin];
+    const requestOrigin = request.headers.get("Origin");
+    if (requestOrigin && allowed.includes(requestOrigin)) {
+      return { ...base, "Access-Control-Allow-Origin": requestOrigin, Vary: "Origin" };
+    }
+    // No matching allowlisted origin -> omit Access-Control-Allow-Origin so
+    // the browser blocks the response, without leaking which origins ARE allowed.
+    return base;
+  }
 
   return async (request: Request): Promise<Response> => {
+    const corsHeaders = buildCorsHeaders(request);
+    const json = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
+
+    if (options.authorize) {
+      let authorized: boolean;
+      try {
+        authorized = await options.authorize(request);
+      } catch {
+        authorized = false;
+      }
+      if (!authorized) {
+        return json({ error: "Unauthorized" }, 401);
+      }
+    }
+
     // GET would open a server->client SSE stream; we have no server-initiated
     // messages yet, so decline it (clients fall back to request/response).
     if (request.method === "GET") {
@@ -161,26 +203,53 @@ function uiMetaFor(c: CompiledComponent): Record<string, unknown> {
   return ui;
 }
 
-/** ChatGPT legacy `openai/widgetCSP` (snake_case), or undefined if nothing set. */
-function openaiWidgetCsp(csp?: McpUiResourceCsp): Record<string, string[]> | undefined {
+/** Resolve an app's `compat` setting to the host profiles to mirror `_meta` for. */
+function compatProfiles(compat: AppDefinition["compat"]): HostProfile[] {
+  if (!compat) return [];
+  const hostIds: HostId[] = compat === true ? ["chatgpt"] : compat;
+  return hostIds.map((id) => HOST_PROFILES[id]).filter((p): p is HostProfile => !!p);
+}
+
+/** A host's vendor CSP mirror (e.g. ChatGPT's snake_case `widgetCSP`), driven by its `cspKeyMap`. */
+function widgetCspFor(
+  profile: HostProfile,
+  csp?: McpUiResourceCsp,
+): Record<string, string[]> | undefined {
   if (!csp) return undefined;
   const out: Record<string, string[]> = {};
-  if (csp.connectDomains) out.connect_domains = csp.connectDomains;
-  if (csp.resourceDomains) out.resource_domains = csp.resourceDomains;
+  for (const [bucket, vendorKey] of Object.entries(profile.cspKeyMap) as [
+    keyof McpUiResourceCsp,
+    string,
+  ][]) {
+    const value = csp[bucket];
+    if (value) out[vendorKey] = value;
+  }
   return Object.keys(out).length ? out : undefined;
+}
+
+/** Mirror the spec `_meta.ui` block into each target host's vendor `_meta` keys. */
+function mirrorCompatMeta(
+  meta: Record<string, unknown>,
+  compat: AppDefinition["compat"],
+  uri: string,
+  csp: McpUiResourceCsp | undefined,
+): void {
+  for (const profile of compatProfiles(compat)) {
+    if (!profile.metaKeys) continue;
+    if (profile.metaKeys.outputTemplate) meta[profile.metaKeys.outputTemplate] = uri;
+    if (profile.metaKeys.uiResourceUri) meta[profile.metaKeys.uiResourceUri] = uri;
+    if (profile.metaKeys.widgetCsp) {
+      const widgetCsp = widgetCspFor(profile, csp);
+      if (widgetCsp) meta[profile.metaKeys.widgetCsp] = widgetCsp;
+    }
+  }
 }
 
 function describeTool(app: McpApp, tool: AnyToolDefinition) {
   const meta: Record<string, unknown> = {};
   if (tool.ui) {
     meta.ui = uiMetaFor(tool.ui);
-    if (app.compat) {
-      // Mirror vendor-specific keys so the same server works across hosts.
-      meta["openai/outputTemplate"] = tool.ui.uri;
-      meta["mcpui.dev/ui-resource-uri"] = tool.ui.uri;
-      const widgetCsp = openaiWidgetCsp(tool.ui.csp);
-      if (widgetCsp) meta["openai/widgetCSP"] = widgetCsp;
-    }
+    mirrorCompatMeta(meta, app.compat, tool.ui.uri, tool.ui.csp);
   }
   return {
     name: tool.name,
@@ -230,10 +299,7 @@ async function readResource(app: McpApp, params: unknown, ctx?: DispatchCtx): Pr
     throw new RpcError(JsonRpcErrorCode.InvalidParams, `Unknown resource: ${uri}`);
   }
   const meta: Record<string, unknown> = { ui: uiMetaFor(component) };
-  if (app.compat) {
-    const widgetCsp = openaiWidgetCsp(component.csp);
-    if (widgetCsp) meta["openai/widgetCSP"] = widgetCsp;
-  }
+  mirrorCompatMeta(meta, app.compat, component.uri, component.csp);
   // Resolve the HTML lazily (e.g. from a static asset) when a resolver is given
   // and the component points at one; otherwise use the bundled `html`.
   const text =
@@ -247,7 +313,14 @@ async function readResource(app: McpApp, params: unknown, ctx?: DispatchCtx): Pr
 
 function negotiateVersion(params: unknown): string {
   const requested = (params as { protocolVersion?: string } | undefined)?.protocolVersion;
-  return requested ?? SUPPORTED_PROTOCOL_VERSION;
+  if (requested === undefined) return SUPPORTED_PROTOCOL_VERSION;
+  if (requested !== SUPPORTED_PROTOCOL_VERSION) {
+    throw new RpcError(
+      JsonRpcErrorCode.InvalidParams,
+      `Unsupported protocolVersion "${requested}" (server supports "${SUPPORTED_PROTOCOL_VERSION}")`,
+    );
+  }
+  return requested;
 }
 
 function toJsonSchema(schema: { toJSONSchema(): unknown }) {

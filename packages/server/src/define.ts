@@ -1,4 +1,4 @@
-import type { CompiledComponent } from "@mcpapps/protocol";
+import type { CompiledComponent, HostId } from "@mcpapps/protocol";
 import type { z } from "zod";
 
 export type { CompiledComponent };
@@ -46,8 +46,12 @@ export interface AppDefinition {
   version: string;
   renderer: RendererName;
   tools: AnyToolDefinition[];
-  /** Mirror vendor-specific `_meta` keys (e.g. ChatGPT) for cross-host portability. */
-  compat?: boolean;
+  /**
+   * Mirror vendor-specific `_meta` keys for cross-host portability. `true` is
+   * shorthand for `["chatgpt"]`; pass an explicit `HostId[]` to target other
+   * or multiple hosts.
+   */
+  compat?: boolean | HostId[];
 }
 
 export interface McpApp extends AppDefinition {

@@ -135,4 +135,100 @@ describe("createMcpHandler", () => {
     const res = await rpc(handler, { jsonrpc: "2.0", method: "notifications/initialized" });
     expect(res.status).toBe(202);
   });
+
+  it("rejects an unsupported client-requested protocol version", async () => {
+    const res = await rpc(handler, {
+      jsonrpc: "2.0",
+      id: 8,
+      method: "initialize",
+      params: { protocolVersion: "1999-01-01" },
+    });
+    const body = await res.json();
+    expect(body.error.message).toContain("Unsupported protocolVersion");
+  });
+
+  it("accepts compat as an explicit HostId[]", async () => {
+    const arrayApp = defineApp({
+      name: "weather-app",
+      version: "1.0.0",
+      renderer: "vue",
+      compat: ["chatgpt"],
+      tools: [weather],
+    });
+    const arrayHandler = createMcpHandler(arrayApp);
+    const res = await rpc(arrayHandler, { jsonrpc: "2.0", id: 2, method: "tools/list" });
+    const body = await res.json();
+    expect(body.result.tools[0]._meta["openai/outputTemplate"]).toBe("ui://weather/get_weather");
+  });
+});
+
+describe("createMcpHandler authorize", () => {
+  it("returns 401 and never dispatches when authorize rejects", async () => {
+    let dispatched = false;
+    const guardedApp = defineApp({
+      name: "weather-app",
+      version: "1.0.0",
+      renderer: "vue",
+      tools: [
+        defineTool({
+          ...weather,
+          handler: (args) => {
+            dispatched = true;
+            return weather.handler(args);
+          },
+        }),
+      ],
+    });
+    const handler = createMcpHandler(guardedApp, { authorize: () => false });
+    const res = await rpc(handler, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "get_weather", arguments: { city: "London" } },
+    });
+    expect(res.status).toBe(401);
+    expect(dispatched).toBe(false);
+  });
+
+  it("allows the request through when authorize resolves true", async () => {
+    const handler = createMcpHandler(app, { authorize: () => true });
+    const res = await rpc(handler, { jsonrpc: "2.0", id: 1, method: "tools/list" });
+    expect(res.status).toBe(200);
+  });
+
+  it("always answers OPTIONS preflight even when authorize would reject", async () => {
+    const handler = createMcpHandler(app, { authorize: () => false });
+    const res = await handler(new Request("http://localhost/mcp", { method: "OPTIONS" }));
+    expect(res.status).toBe(204);
+  });
+});
+
+describe("createMcpHandler cors", () => {
+  it("defaults to a permissive wildcard origin", async () => {
+    const handler = createMcpHandler(app);
+    const res = await rpc(handler, { jsonrpc: "2.0", id: 1, method: "tools/list" });
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  });
+
+  it("reflects an allowlisted origin and omits the header for a disallowed one", async () => {
+    const handler = createMcpHandler(app, { cors: { origin: "https://allowed.example.com" } });
+
+    const allowed = await handler(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: "https://allowed.example.com" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+      }),
+    );
+    expect(allowed.headers.get("Access-Control-Allow-Origin")).toBe("https://allowed.example.com");
+
+    const disallowed = await handler(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: "https://evil.example.com" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+      }),
+    );
+    expect(disallowed.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
 });
