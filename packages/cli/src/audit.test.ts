@@ -192,9 +192,8 @@ describe("staticToolChecks", () => {
 
   it("fails when input/output schemas are missing", () => {
     const checks: Check[] = [];
-    // biome-ignore lint/suspicious/noExplicitAny: exercising an invalid shape on purpose
     staticToolChecks(
-      { name: "app", renderer: "vue", resourceMap: new Map(), tools: [{ name: "x" } as any] },
+      { name: "app", renderer: "vue", resourceMap: new Map(), tools: [{ name: "x" }] },
       checks,
     );
     expect(checks.some((c) => c.label.includes("schemas") && c.status === "fail")).toBe(true);
