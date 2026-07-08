@@ -1,4 +1,9 @@
-import { AppNotifications, HostMethods, HostNotifications } from "@mcpapps/protocol";
+import {
+  AppNotifications,
+  HostMethods,
+  HostNotifications,
+  PROTOCOL_VERSION,
+} from "@mcpapps/protocol";
 
 /**
  * The emulator's host surface. Renders a compiled component in a *real*
@@ -19,6 +24,7 @@ export function renderHostPage(opts: {
     mcpPath: opts.mcpPath,
     renderer: opts.renderer,
     components: opts.components,
+    protocolVersion: PROTOCOL_VERSION,
     methods: {
       initialize: HostMethods.Initialize,
       callTool: HostMethods.CallTool,
@@ -243,7 +249,7 @@ window.addEventListener("message", async (event) => {
       let result = {};
       if (msg.method === M.initialize) {
         result = {
-          protocolVersion: "2026-01-26",
+          protocolVersion: CONFIG.protocolVersion,
           hostInfo: { name: "mcpapps-emulator", version: "0.0.0" },
           hostCapabilities: { serverTools: {}, serverResources: {} },
           hostContext: hostContext(),

@@ -1,8 +1,24 @@
-import { AppNotifications, HostMethods, HostNotifications } from "@mcpapps/protocol";
+import {
+  AppNotifications,
+  HostMethods,
+  HostNotifications,
+  PROTOCOL_VERSION,
+} from "@mcpapps/protocol";
 import { describe, expect, it } from "vitest";
 import { renderHostPage } from "./host-page.js";
 
 describe("renderHostPage", () => {
+  it("embeds the protocol's PROTOCOL_VERSION rather than a hand-copied string", () => {
+    const html = renderHostPage({
+      appName: "demo",
+      mcpPath: "/mcp",
+      renderer: "vue",
+      components: {},
+    });
+    expect(html).toContain(`"protocolVersion":"${PROTOCOL_VERSION}"`);
+    expect(html).toContain("protocolVersion: CONFIG.protocolVersion");
+  });
+
   it("embeds the exact MCP Apps lifecycle method names from the protocol", () => {
     const html = renderHostPage({
       appName: "demo",
