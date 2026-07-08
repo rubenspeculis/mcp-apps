@@ -77,6 +77,12 @@ export interface HostBridge {
 export interface CreateHostBridgeOptions {
   /** Defaults to a postMessage transport to `window.parent`. */
   transport?: Transport;
+  /**
+   * Reject `window.parent` messages from an unexpected origin. Only applies
+   * when `transport` is not supplied (it forwards to the default transport's
+   * own `expectedOrigin`). Omit for hosts with an opaque `srcdoc` origin.
+   */
+  expectedOrigin?: string;
   /** Display modes the app supports; advertised in `ui/initialize`. */
   availableDisplayModes?: DisplayMode[];
   /** Override the `ui/initialize` response timeout. Defaults to 2000ms. */
@@ -86,7 +92,11 @@ export interface CreateHostBridgeOptions {
 }
 
 export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBridge {
-  const transport = options.transport ?? createPostMessageTransport();
+  const transport =
+    options.transport ??
+    createPostMessageTransport(
+      options.expectedOrigin ? { expectedOrigin: options.expectedOrigin } : undefined,
+    );
 
   let latestToolResult: ToolResultEnvelope | null = null;
   let latestToolInput: Record<string, unknown> | null = null;
@@ -131,12 +141,13 @@ export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBri
         }
         case HostNotifications.ToolInput:
         case HostNotifications.ToolInputPartial: {
-          const params = (message.params ?? {}) as ToolInputParams;
-          publishToolInput(params.arguments ?? {});
+          if (!isToolInputParams(message.params)) break;
+          publishToolInput(message.params.arguments);
           break;
         }
         case HostNotifications.HostContextChanged: {
-          applyHostContext((message.params ?? {}) as HostContext);
+          if (!isHostContext(message.params)) break;
+          applyHostContext(message.params);
           break;
         }
         default:
@@ -259,6 +270,13 @@ export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBri
         reportInitializeFallback(error);
         result = { protocolVersion: PROTOCOL_VERSION };
       }
+      if (result.protocolVersion !== PROTOCOL_VERSION) {
+        reportInitializeFallback(
+          new Error(
+            `host reported incompatible protocolVersion "${result.protocolVersion}" (app expects "${PROTOCOL_VERSION}")`,
+          ),
+        );
+      }
       if (result.hostContext) applyHostContext(result.hostContext);
       transport.send({ jsonrpc: "2.0", method: AppNotifications.Initialized, params: {} });
       return result;
@@ -284,6 +302,36 @@ export function createHostBridge(options: CreateHostBridgeOptions = {}): HostBri
     }
     console.warn(`@mcpapps/client-core: ui/initialize fallback: ${error.message}`);
   }
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+/** Guards the `ui/notifications/tool-input(-partial)` payload before it's trusted. */
+function isToolInputParams(v: unknown): v is ToolInputParams {
+  return isRecord(v) && isRecord(v.arguments);
+}
+
+/**
+ * Guards the `ui/initialize` response's / `host-context-changed`'s host
+ * context — only the fields `applyHostContext`/`themeFromContext` actually
+ * read, so a malformed host message is dropped instead of corrupting state.
+ */
+function isHostContext(v: unknown): v is HostContext {
+  if (!isRecord(v)) return false;
+  if ("theme" in v && v.theme !== undefined && v.theme !== "light" && v.theme !== "dark") {
+    return false;
+  }
+  if ("styles" in v && v.styles !== undefined && !isRecord(v.styles)) return false;
+  if (
+    "containerDimensions" in v &&
+    v.containerDimensions !== undefined &&
+    !isRecord(v.containerDimensions)
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /** Derive the normalized theme from a host context's theme + style variables. */
