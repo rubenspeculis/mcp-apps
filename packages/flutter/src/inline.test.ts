@@ -62,4 +62,23 @@ describe("inlineFlutterBuild", () => {
     expect(html).not.toContain("assets/NOTICES");
     expect(html).not.toContain("skwasm.js");
   });
+
+  it("refuses to inline host glue containing a literal </script>", async () => {
+    await fixtureBuild();
+    await expect(inlineFlutterBuild({ webDir, hostGlue: "var x = '</script>';" })).rejects.toThrow(
+      /script.*breakout|refusing to inline/i,
+    );
+  });
+
+  it("refuses to inline a bootstrap file containing a literal </script>", async () => {
+    await writeFile(
+      join(webDir, "index.html"),
+      `<!doctype html><html><head></head>` +
+        `<body><script src="flutter_bootstrap.js" async></script></body></html>`,
+    );
+    await writeFile(join(webDir, "flutter_bootstrap.js"), "console.log('</script>');");
+    await expect(inlineFlutterBuild({ webDir, hostGlue: "" })).rejects.toThrow(
+      /refusing to inline/i,
+    );
+  });
 });

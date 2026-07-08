@@ -4,6 +4,8 @@
  * resource CSP-friendly inside the host's sandboxed iframe.
  */
 export function renderComponentHtml(opts: { js: string; css: string; title?: string }): string {
+  assertNoTagBreakout(opts.js, "script", "component JS");
+  assertNoTagBreakout(opts.css, "style", "component CSS");
   const title = opts.title ?? "MCP App";
   const style = opts.css ? `<style>${opts.css}</style>` : "";
   return `<!doctype html>
@@ -20,6 +22,15 @@ export function renderComponentHtml(opts: { js: string; css: string; title?: str
     <script>${opts.js}</script>
   </body>
 </html>`;
+}
+
+/** Refuse to inline a string that would close its wrapping tag early. */
+function assertNoTagBreakout(source: string, tag: "script" | "style", label: string): void {
+  if (new RegExp(`</${tag}`, "i").test(source)) {
+    throw new Error(
+      `renderComponentHtml: ${label} contains a literal "</${tag}>" — refusing to inline.`,
+    );
+  }
 }
 
 function escapeHtml(value: string): string {

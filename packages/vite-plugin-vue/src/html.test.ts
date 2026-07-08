@@ -26,4 +26,16 @@ describe("renderComponentHtml", () => {
     expect(html).not.toContain("</title><img>");
     expect(html).toContain("&lt;/title&gt;&lt;img&gt;");
   });
+
+  it("refuses to inline JS containing a literal </script>", () => {
+    expect(() => renderComponentHtml({ js: "var x = '</script>';", css: "" })).toThrow(
+      /refusing to inline/i,
+    );
+  });
+
+  it("refuses to inline CSS containing a literal </style>", () => {
+    expect(() => renderComponentHtml({ js: "", css: "</style><script>evil()</script>" })).toThrow(
+      /refusing to inline/i,
+    );
+  });
 });

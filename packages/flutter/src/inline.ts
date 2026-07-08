@@ -28,6 +28,8 @@ export interface InlineFlutterOptions {
  * WebAssembly itself runs because Claude's sandbox permits it (verified).
  */
 export async function inlineFlutterBuild(opts: InlineFlutterOptions): Promise<string> {
+  assertNoScriptBreakout(opts.hostGlue, "host-glue bundle");
+
   const files = new Map<string, Uint8Array>();
   for await (const file of walk(opts.webDir)) {
     const rel = relative(opts.webDir, file).split(sep).join("/");
@@ -44,6 +46,7 @@ export async function inlineFlutterBuild(opts: InlineFlutterOptions): Promise<st
   // flutter_bootstrap.js is referenced by a parsed <script src> in index.html, so
   // our createElement hook can't catch it — inline its text directly instead.
   const bootstrapJs = decodeOrEmpty(files.get("flutter_bootstrap.js"));
+  assertNoScriptBreakout(bootstrapJs, "flutter_bootstrap.js");
   files.delete("flutter_bootstrap.js");
   // The service worker is irrelevant when everything is inlined.
   files.delete("flutter_service_worker.js");
@@ -54,6 +57,10 @@ export async function inlineFlutterBuild(opts: InlineFlutterOptions): Promise<st
   }
 
   const interceptor = INTERCEPTOR_JS.replace("__ASSETS_JSON__", JSON.stringify(assets));
+  // Asset *values* are base64 (breakout-safe by construction), but asset
+  // *keys* are real filenames from the build output — guard the assembled
+  // interceptor as a whole rather than trusting that invariant blindly.
+  assertNoScriptBreakout(interceptor, "flutter inline interceptor/assets");
 
   // Neutralize <base href> so relative resolution is predictable; the shims match
   // by path suffix/basename regardless.
@@ -101,6 +108,20 @@ function includeAsset(rel: string): boolean {
   return true;
 }
 
+/**
+ * Enforce the invariant `INTERCEPTOR_JS`'s doc comment already assumes: none
+ * of what gets inlined into a `<script>` tag may contain a literal
+ * `</script>`, or it would close the tag early and let the rest be parsed as
+ * HTML.
+ */
+function assertNoScriptBreakout(source: string, label: string): void {
+  if (/<\/script/i.test(source)) {
+    throw new Error(
+      `inlineFlutterBuild: ${label} contains a literal "</script>" — refusing to inline.`,
+    );
+  }
+}
+
 function decodeOrEmpty(buf: Uint8Array | undefined): string {
   return buf ? new TextDecoder().decode(buf) : "";
 }
@@ -121,6 +142,11 @@ async function* walk(dir: string): AsyncGenerator<string> {
  * Runtime shim injected first into the document. `__ASSETS_JSON__` is replaced
  * with `{ "<relpath>": { m: <mime>, d: <base64> } }`. Must contain no literal
  * `</script>` (we never emit one here).
+ *
+ * The shimmed `XMLHttpRequest`'s `responseType` defaults to `""` (matching the
+ * real spec default) — `inline.browser.test.ts` caught a regression where an
+ * uninitialized `responseType` made the shim treat every response as binary
+ * and return an empty `responseText`.
  */
 const INTERCEPTOR_JS = `
 (function(){
@@ -145,7 +171,7 @@ const INTERCEPTOR_JS = `
   window.fetch=function(input,init){var u=typeof input==='string'?input:(input&&input.url);var k=find(u);if(k)return Promise.resolve(makeResp(k));return of?of(input,init):Promise.reject(new Error('inline: blocked fetch '+u));};
 
   var OX=window.XMLHttpRequest;
-  function SX(){this._real=null;this._k=null;this.readyState=0;}
+  function SX(){this._real=null;this._k=null;this.readyState=0;this.responseType='';}
   SX.prototype.open=function(m,u){this._k=find(u);if(this._k){this._m=m;}else{this._real=new OX();this._real.open.apply(this._real,arguments);}};
   SX.prototype.setRequestHeader=function(){if(this._real)this._real.setRequestHeader.apply(this._real,arguments);};
   SX.prototype.getAllResponseHeaders=function(){return this._real?this._real.getAllResponseHeaders():('content-type: '+A[this._k].m+'\\r\\n');};
