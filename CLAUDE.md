@@ -24,3 +24,17 @@ Allows inline scripts, `eval`, WebAssembly, and `blob:`/`data:` dynamic `import(
 - `examples/weather-flutter` uses a **local path** dep on `packages/flutter_bridge`. The CLI scaffolds the bridge dep version-aware (`create.ts:detectBridgeDep`): a **local path** when run in-repo, else a **git** dep pinned to `ref: v<cli version>` — so published scaffolds track a release tag, not `main` (the release must cut that tag).
 - Dep versions pinned in the `pnpm-workspace.yaml` **catalog** with `minimumReleaseAge: 10080` (7-day supply-chain gate).
 - The two examples' `build` task is codegen-only (writes `src/generated/**`, gitignored), not a bundler step — `turbo.json` overrides their `outputs` to `["src/generated/**"]` instead of the default `dist/**`. Don't set it to `[]`: turbo still treats an unchanged hash as a cache hit, so if the declared outputs don't match what the task actually writes, a hit won't restore the deleted/missing generated files.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the five default triage labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Use a single-context layout. See `docs/agents/domain.md`.
