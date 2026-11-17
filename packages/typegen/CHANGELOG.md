@@ -1,5 +1,13 @@
 # @mcpapps/typegen
 
+## 0.2.1
+
+### Patch Changes
+
+- e2a37a5: Update runtime and peer dependencies to patched Hono, Zod, Vue and Vite releases.
+  Update the Node server adapter and generated Vue/Flutter projects to patched
+  versions, including Wrangler, so scaffolds do not reintroduce vulnerable pins.
+
 ## 0.2.0
 
 ## 0.1.4
