@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
-    "docus": "^5.12.3",
-    "nuxt": "^4.4.8"
+    "docus": "^5.15.0",
+    "nuxt": "^4.6.4"
   },
   "devDependencies": {
     "wrangler": "catalog:"
