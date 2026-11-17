@@ -1,92 +1,22 @@
 import { spawn } from "node:child_process";
 import { watch } from "node:fs";
-import { resolve } from "node:path";
-import { createJiti } from "jiti";
-import type { ComponentEntry, McpAppConfig } from "./config.js";
-
-// Minimal shapes for the project-local modules we load dynamically via jiti.
-type ResourceMap = Map<string, unknown>;
-type LoadedApp = { name: string; renderer: string; resourceMap: ResourceMap };
-type CompiledComponent = { uri: string; html: string };
-export type ComponentSpec = {
-  name: string;
-  entry: string;
-  uri: string;
-  title?: string;
-  csp?: ComponentEntry["csp"];
-  permissions?: ComponentEntry["permissions"];
-  domain?: string;
-  prefersBorder?: boolean;
-};
-type VitePlugin = {
-  writeComponentsModule: (
-    specs: ComponentSpec[],
-    outFile: string,
-    opts: { root: string },
-  ) => Promise<CompiledComponent[]>;
-};
-type DevPkg = {
-  serveEmulator: (
-    app: unknown,
-    opts: { port?: number },
-  ) => Promise<{ url: string; reload: () => void }>;
-};
-
-export function jitiFor(cwd: string) {
-  return createJiti(resolve(cwd, "_cli.js"), { interopDefault: true });
-}
-
-export async function loadConfig(
-  cwd: string,
-  jiti: ReturnType<typeof createJiti>,
-): Promise<McpAppConfig> {
-  const mod = (await jiti.import(resolve(cwd, "mcpapps.config.ts"))) as
-    | McpAppConfig
-    | { default: McpAppConfig };
-  return "renderer" in mod ? mod : mod.default;
-}
-
-export function specsFor(cwd: string, config: McpAppConfig): ComponentSpec[] {
-  return (config.components ?? []).map((c) => ({
-    name: c.name,
-    entry: resolve(cwd, c.entry),
-    uri: c.uri,
-    ...(c.title ? { title: c.title } : {}),
-    ...(c.csp ? { csp: c.csp } : {}),
-    ...(c.permissions ? { permissions: c.permissions } : {}),
-    ...(c.domain ? { domain: c.domain } : {}),
-    ...(c.prefersBorder !== undefined ? { prefersBorder: c.prefersBorder } : {}),
-  }));
-}
-
-export function generatedPath(cwd: string, config: McpAppConfig) {
-  return resolve(cwd, config.generated ?? "src/generated/components.ts");
-}
+import { buildProject, jitiFor, prepareProject } from "./project.js";
 
 /** `mcpapps dev` — codegen, serve the emulator, and live-reload on edits. */
 export async function devCommand(): Promise<void> {
   const cwd = process.cwd();
   const jiti = jitiFor(cwd);
-  const config = await loadConfig(cwd, jiti);
+  const prepared = await prepareProject(cwd, "vue");
+  const { app, config } = prepared;
 
-  if (config.renderer !== "vue") {
-    console.error("`mcpapps dev` supports the vue renderer. For Flutter, run `pnpm start`.");
-    process.exitCode = 1;
-    return;
-  }
+  const { serveEmulator } = await jiti.import<{
+    serveEmulator: (
+      app: unknown,
+      opts: { port?: number },
+    ) => Promise<{ url: string; reload: () => void }>;
+  }>("@mcpapps/dev");
 
-  const { writeComponentsModule } = (await jiti.import("@mcpapps/vite-plugin-vue")) as VitePlugin;
-  const { serveEmulator } = (await jiti.import("@mcpapps/dev")) as DevPkg;
-  const specs = specsFor(cwd, config);
-  const generated = generatedPath(cwd, config);
-
-  const built = await writeComponentsModule(specs, generated, { root: cwd });
-  const app = ((await jiti.import(resolve(cwd, config.app))) as { app: LoadedApp }).app;
-  specs.forEach((s, i) => {
-    if (built[i]) app.resourceMap.set(s.uri, built[i]);
-  });
-
-  const emulator = await serveEmulator(app, config.port ? { port: config.port } : {});
+  const emulator = await serveEmulator(app, config?.port ? { port: config.port } : {});
   console.log(`\n  ▸ emulator   ${emulator.url}`);
   console.log(`  ▸ mcp        ${emulator.url}/mcp`);
   console.log("\n  watching components — save to live-reload\n");
@@ -96,10 +26,7 @@ export async function devCommand(): Promise<void> {
     clearTimeout(timer);
     timer = setTimeout(async () => {
       try {
-        const fresh = await writeComponentsModule(specs, generated, { root: cwd });
-        specs.forEach((s, i) => {
-          if (fresh[i]) app.resourceMap.set(s.uri, fresh[i]);
-        });
+        await prepared.rebuild();
         emulator.reload();
         console.log("  ↻ reloaded");
       } catch (err) {
@@ -107,16 +34,14 @@ export async function devCommand(): Promise<void> {
       }
     }, 80);
   };
-  for (const spec of specs) watch(spec.entry, rebuild);
+  for (const entry of prepared.watchPaths) watch(entry, rebuild);
 }
 
 /** `mcpapps serve [--stdio]` — run the MCP server (HTTP or stdio). */
 export async function serveCommand(argv: string[]): Promise<void> {
   const cwd = process.cwd();
   const jiti = jitiFor(cwd);
-  const config = await loadConfig(cwd, jiti);
-  await codegenIfVue(cwd, jiti, config);
-  const app = ((await jiti.import(resolve(cwd, config.app))) as { app: unknown }).app;
+  const { app } = await prepareProject(cwd);
 
   if (argv.includes("--stdio")) {
     const { serveStdio } = (await jiti.import("@mcpapps/server/stdio")) as {
@@ -144,32 +69,17 @@ export async function serveCommand(argv: string[]): Promise<void> {
 
 /** `mcpapps build` — compile components (codegen). */
 export async function buildCommand(): Promise<void> {
-  const cwd = process.cwd();
-  const jiti = jitiFor(cwd);
-  const config = await loadConfig(cwd, jiti);
-  await codegenIfVue(cwd, jiti, config);
+  await buildProject(process.cwd());
   console.log("✓ build complete");
 }
 
 /** `mcpapps deploy` — codegen then `wrangler deploy`. */
 export async function deployCommand(): Promise<void> {
   const cwd = process.cwd();
-  const jiti = jitiFor(cwd);
-  const config = await loadConfig(cwd, jiti);
-  await codegenIfVue(cwd, jiti, config);
+  await buildProject(cwd);
   await new Promise<void>((res, rej) => {
     const child = spawn("wrangler", ["deploy"], { cwd, stdio: "inherit" });
     child.on("error", rej);
     child.on("exit", (code) => (code === 0 ? res() : rej(new Error(`wrangler exited (${code})`))));
   });
-}
-
-async function codegenIfVue(
-  cwd: string,
-  jiti: ReturnType<typeof createJiti>,
-  config: McpAppConfig,
-): Promise<void> {
-  if (config.renderer !== "vue") return;
-  const { writeComponentsModule } = (await jiti.import("@mcpapps/vite-plugin-vue")) as VitePlugin;
-  await writeComponentsModule(specsFor(cwd, config), generatedPath(cwd, config), { root: cwd });
 }

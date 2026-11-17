@@ -3,31 +3,9 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { HOST_PROFILES, type HostId } from "@mcpapps/protocol";
 import { parseArgs } from "./args.js";
-import { generatedPath, jitiFor, loadConfig, specsFor } from "./commands.js";
 import type { McpAppConfig, McpUiResourceCsp } from "./config.js";
-
-// --- Minimal structural shapes for the project-local modules loaded via jiti ---
-
-type CompiledComponentLike = {
-  uri: string;
-  html?: string;
-  htmlAsset?: string;
-  basePath?: string;
-  assets?: Record<string, unknown>;
-  csp?: McpUiResourceCsp;
-};
-type ToolLike = {
-  name: string;
-  inputSchema?: unknown;
-  outputSchema?: unknown;
-  ui?: CompiledComponentLike;
-};
-type LoadedApp = {
-  name: string;
-  renderer: string;
-  tools?: ToolLike[];
-  resourceMap: Map<string, CompiledComponentLike>;
-};
+import { createOriginPolicy } from "./origin-policy.js";
+import { jitiFor, type ProjectApp, type ProjectTool, prepareProject } from "./project.js";
 
 // Structural subset of the Playwright API the runtime layer uses. Declared
 // locally so `playwright` stays a pure optional runtime dep — no type or install
@@ -79,28 +57,6 @@ function cspBucketsForHost(host: HostId): (typeof CSP_BUCKETS)[number][] {
 }
 
 /**
- * A declared CSP origin must be an absolute `http(s)` URL, optionally with a
- * leading `*.` wildcard label (`https://*.example.com`) — matching the shape
- * `originAllowed` below actually knows how to match. Rejects bare `"*"`,
- * scheme-only strings, `data:`, and CSP keyword literals like `'unsafe-inline'`,
- * which previously passed the shape check as "a string in an array". Compared
- * case-insensitively (scheme/host are case-insensitive per RFC 3986) against
- * `URL.origin`, which WHATWG normalizes to lowercase.
- */
-function isValidCspOrigin(value: string): boolean {
-  const probe = value.replace(/^(https?:\/\/)\*\./i, "$1wildcard.");
-  let url: URL;
-  try {
-    url = new URL(probe);
-  } catch {
-    return false;
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-  if (!url.hostname) return false;
-  return probe.toLowerCase() === url.origin;
-}
-
-/**
  * `mcpapps audit [--static-only] [--runtime] [--port N]` — a skybridge-style
  * conformance check developers run before publishing. Static validation always
  * runs; the headless-browser runtime pass runs by default (and is required by
@@ -122,35 +78,27 @@ export async function auditCommand(argv: string[]): Promise<void> {
   const targetHosts: HostId[] = hostFlag === "all" ? HOST_IDS : [hostFlag as HostId];
 
   const cwd = process.cwd();
-  const hasConfig = existsSync(resolve(cwd, "mcpapps.config.ts"));
-  const workerEntry = resolve(cwd, "src/worker.ts");
-  const isFlutterProject = !hasConfig && existsSync(workerEntry);
-  if (!hasConfig && !isFlutterProject) {
-    console.error(
-      "Not an MCP App project — expected mcpapps.config.ts (vue) or src/worker.ts (flutter).",
-    );
-    process.exitCode = 1;
-    return;
-  }
-
   const checks: Check[] = [];
-  const jiti = jitiFor(cwd);
-
-  // --- Layer A: static validation (no browser) ---
-  // Vue declares components in mcpapps.config.ts; Flutter has none — its single
-  // component is wired up in src/worker.ts and built by src/pre-deploy.ts.
-  const config = hasConfig ? await loadConfig(cwd, jiti) : undefined;
-  if (config) staticConfigChecks(config, cwd, checks);
-  const appEntry = config ? resolve(cwd, config.app) : workerEntry;
-  const app = await loadApp(appEntry, jiti, checks);
-  if (app) {
+  let app: ProjectApp | undefined;
+  try {
+    // Static means browser-free, not build-free. Prepare once so both audit
+    // passes inspect the exact resources the emulator will serve.
+    const prepared = await prepareProject(cwd);
+    app = prepared.app;
+    checks.push({ label: "project: resources prepared", status: "pass" });
+    if (prepared.config) staticConfigChecks(prepared.config, cwd, checks);
     staticToolChecks(app, checks, targetHosts);
-    if (isFlutterProject) flutterArtifactChecks(cwd, checks);
+    if (app.renderer === "flutter") flutterArtifactChecks(cwd, checks);
+  } catch (error) {
+    checks.push({
+      label: "project: preparation",
+      status: "fail",
+      detail: error instanceof Error ? error.message : String(error),
+    });
   }
 
-  // --- Layer B: headless-browser runtime conformance ---
   if (app && !staticOnly) {
-    await runtimeChecks(cwd, jiti, config, app, { port, forceRuntime, targetHosts, checks });
+    await runtimeChecks(jitiFor(cwd), app, { port, forceRuntime, targetHosts, checks });
   } else if (staticOnly) {
     checks.push({ label: "runtime: skipped (--static-only)", status: "skip" });
   }
@@ -230,7 +178,7 @@ export function cspShapeCheck(
       });
       continue;
     }
-    const invalid = value.filter((v: string) => !isValidCspOrigin(v));
+    const { invalid } = createOriginPolicy(value);
     if (invalid.length) {
       checks.push({
         label: `${scope}: csp.${key}`,
@@ -241,27 +189,8 @@ export function cspShapeCheck(
   }
 }
 
-export async function loadApp(
-  entry: string,
-  jiti: ReturnType<typeof jitiFor>,
-  checks: Check[],
-): Promise<LoadedApp | null> {
-  const rel = entry.split("/").slice(-2).join("/");
-  try {
-    const mod = (await jiti.import(entry)) as { app?: LoadedApp };
-    if (!mod.app) {
-      throw new Error(`${rel} must \`export { app }\` (the defineApp result) for auditing`);
-    }
-    checks.push({ label: `app: loaded ${rel}`, status: "pass" });
-    return mod.app;
-  } catch (err) {
-    checks.push({ label: "app: load", status: "fail", detail: (err as Error).message });
-    return null;
-  }
-}
-
 export function staticToolChecks(
-  app: LoadedApp,
+  app: ProjectApp,
   checks: Check[],
   targetHosts: HostId[] = HOST_IDS,
 ): void {
@@ -337,16 +266,14 @@ interface RuntimeOpts {
 }
 
 /**
- * Build the components, serve the dev emulator, and drive it in a headless
+ * Serve the prepared app in the dev emulator and drive it in a headless
  * browser: assert each UI tool completes the ui/initialize handshake, reports a
  * non-zero size (the classic 0-height collapse), and only contacts origins it
  * declared in `connectDomains`.
  */
 async function runtimeChecks(
-  cwd: string,
   jiti: ReturnType<typeof jitiFor>,
-  config: McpAppConfig | undefined,
-  app: LoadedApp,
+  app: ProjectApp,
   { port, forceRuntime, targetHosts, checks }: RuntimeOpts,
 ): Promise<void> {
   // Playwright is an optional dependency so static audit never pulls a browser.
@@ -365,10 +292,19 @@ async function runtimeChecks(
     return;
   }
 
-  // Get the components into the app's resourceMap. Vue compiles here; Flutter
-  // must be pre-built (its build needs the Flutter toolchain).
-  const built = await ensureComponents(cwd, jiti, config, app, checks);
-  if (!built) return;
+  // Flutter stays pre-built; htmlAsset-only deployment resolution is outside
+  // the emulator's current delivery support.
+  if (
+    app.renderer === "flutter" &&
+    ![...app.resourceMap.values()].some((resource) => resource.basePath && resource.assets)
+  ) {
+    checks.push({
+      label: "runtime: flutter (skipped)",
+      status: "skip",
+      detail: "build the Flutter app for the emulator first, then re-run audit",
+    });
+    return;
+  }
 
   const { serveEmulator } = (await jiti.import("@mcpapps/dev")) as {
     serveEmulator: (
@@ -378,59 +314,26 @@ async function runtimeChecks(
   };
   const emulator = await serveEmulator(app, port ? { port } : {});
 
-  const browser = await chromium.launch();
+  let browser: PwBrowser | undefined;
   try {
+    browser = await chromium.launch();
     for (const tool of app.tools ?? []) {
       if (!tool.ui) continue;
       await auditToolInBrowser(browser, emulator.url, tool, targetHosts, checks);
     }
+  } catch (error) {
+    checks.push({
+      label: "runtime: browser",
+      status: "fail",
+      detail: error instanceof Error ? error.message : String(error),
+    });
   } finally {
-    await browser.close();
-    await emulator.close();
-  }
-}
-
-/** Compile (vue) or verify pre-built (flutter) components into app.resourceMap. */
-async function ensureComponents(
-  cwd: string,
-  jiti: ReturnType<typeof jitiFor>,
-  config: McpAppConfig | undefined,
-  app: LoadedApp,
-  checks: Check[],
-): Promise<boolean> {
-  if (config?.renderer === "vue") {
     try {
-      const { writeComponentsModule } = (await jiti.import("@mcpapps/vite-plugin-vue")) as {
-        writeComponentsModule: (
-          s: unknown[],
-          out: string,
-          o: { root: string },
-        ) => Promise<CompiledComponentLike[]>;
-      };
-      const specs = specsFor(cwd, config);
-      const out = await writeComponentsModule(specs, generatedPath(cwd, config), { root: cwd });
-      specs.forEach((s, i) => {
-        if (out[i]) app.resourceMap.set(s.uri, out[i] as CompiledComponentLike);
-      });
-      checks.push({ label: "runtime: components compiled", status: "pass" });
-      return true;
-    } catch (err) {
-      checks.push({ label: "runtime: compile", status: "fail", detail: (err as Error).message });
-      return false;
+      await browser?.close();
+    } finally {
+      await emulator.close();
     }
   }
-
-  // Flutter: serve whatever the app already bound (from a prior build).
-  const hasBuilt = [...app.resourceMap.values()].some((c) => c.basePath && c.assets);
-  if (!hasBuilt) {
-    checks.push({
-      label: "runtime: flutter (skipped)",
-      status: "skip",
-      detail: "build the Flutter app first (pnpm build/deploy), then re-run audit",
-    });
-    return false;
-  }
-  return true;
 }
 
 /**
@@ -441,7 +344,7 @@ async function ensureComponents(
 async function auditToolInBrowser(
   browser: PwBrowser,
   url: string,
-  tool: ToolLike,
+  tool: ProjectTool,
   targetHosts: HostId[],
   checks: Check[],
 ): Promise<void> {
@@ -450,7 +353,10 @@ async function auditToolInBrowser(
   // matching what its client would enforce; a Claude run treats all four as
   // declared, since Claude has no dropped-bucket problem.
   const enforcedBuckets = new Set(targetHosts.flatMap((h) => cspBucketsForHost(h)));
-  const declared = new Set([...enforcedBuckets].flatMap((bucket) => tool.ui?.csp?.[bucket] ?? []));
+  const policy = createOriginPolicy(
+    [...enforcedBuckets].flatMap((bucket) => tool.ui?.csp?.[bucket] ?? []),
+  );
+  const emulatorOrigin = new URL(url).origin;
   const undeclared = new Set<string>();
   const page = await browser.newPage();
   if (process.env.AUDIT_DEBUG) {
@@ -460,7 +366,7 @@ async function auditToolInBrowser(
     try {
       if (process.env.AUDIT_DEBUG) console.error("[req]", req.url());
       const origin = new URL(req.url()).origin;
-      if (!req.url().startsWith(url) && !originAllowed(origin, declared)) undeclared.add(origin);
+      if (origin !== emulatorOrigin && !policy.allows(origin)) undeclared.add(origin);
     } catch {
       /* ignore unparsable urls */
     }
@@ -503,24 +409,6 @@ async function auditToolInBrowser(
     }
     await page.close();
   }
-}
-
-/** An origin is allowed if it (or a wildcard parent) is in the declared set. */
-export function originAllowed(origin: string, declared: Set<string>): boolean {
-  if (declared.has(origin)) return true;
-  let host: string;
-  try {
-    host = new URL(origin).host;
-  } catch {
-    return false;
-  }
-  for (const d of declared) {
-    if (d.includes("*")) {
-      const suffix = d.slice(d.indexOf("*") + 1).replace(/^\./, "");
-      if (host === suffix || host.endsWith(`.${suffix}`)) return true;
-    }
-  }
-  return false;
 }
 
 function report(checks: Check[]): void {

@@ -21,7 +21,10 @@ Inside a project:
 | `mcpapps deploy` | Compile, then `wrangler deploy`. |
 
 `mcpapps audit` is a pre-publish conformance check: static validation plus a headless-browser
-runtime pass (lifecycle handshake, non-zero size, CSP drift). The runtime layer needs
-Playwright (`pnpm add -D playwright && npx playwright install chromium`).
+runtime pass (lifecycle handshake, non-zero size, CSP drift). Every audit compiles Vue
+resources before loading the app, including `--static-only`; that flag skips the browser,
+not preparation. Flutter remains pre-built and never launches its compiler from audit.
+The runtime layer needs Playwright
+(`pnpm add -D playwright && npx playwright install chromium`).
 
 Part of [**mcp-apps**](https://github.com/rubenspeculis/mcp-apps).

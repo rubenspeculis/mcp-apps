@@ -6,34 +6,10 @@ import {
   type Check,
   cspShapeCheck,
   flutterArtifactChecks,
-  loadApp,
-  originAllowed,
   staticConfigChecks,
   staticToolChecks,
 } from "./audit.js";
-import { jitiFor } from "./commands.js";
 import type { McpAppConfig } from "./config.js";
-
-describe("originAllowed", () => {
-  it("matches exact declared origins", () => {
-    const declared = new Set(["https://api.example.com"]);
-    expect(originAllowed("https://api.example.com", declared)).toBe(true);
-    expect(originAllowed("https://other.example.com", declared)).toBe(false);
-  });
-
-  it("matches wildcard subdomains and the bare apex", () => {
-    const declared = new Set(["https://*.example.com"]);
-    expect(originAllowed("https://api.example.com", declared)).toBe(true);
-    expect(originAllowed("https://deep.api.example.com", declared)).toBe(true);
-    expect(originAllowed("https://example.com", declared)).toBe(true);
-    expect(originAllowed("https://example.org", declared)).toBe(false);
-    expect(originAllowed("https://notexample.com", declared)).toBe(false);
-  });
-
-  it("treats an empty allowlist as deny-all", () => {
-    expect(originAllowed("https://api.example.com", new Set())).toBe(false);
-  });
-});
 
 describe("cspShapeCheck", () => {
   it("passes a well-formed CSP", () => {
@@ -81,9 +57,12 @@ describe("cspShapeCheck", () => {
     expect(checks).toEqual([]);
   });
 
-  it("accepts an origin with non-lowercase scheme/host", () => {
+  it.each([
+    "https://API.Example.com",
+    "HTTPS://API.Example.com:443",
+  ])("accepts the canonical equivalent origin %s", (origin) => {
     const checks: Check[] = [];
-    cspShapeCheck("scope", { connectDomains: ["https://API.Example.com"] }, checks);
+    cspShapeCheck("scope", { connectDomains: [origin] }, checks);
     expect(checks).toEqual([]);
   });
 });
@@ -336,43 +315,5 @@ describe("flutterArtifactChecks", () => {
     const checks: Check[] = [];
     flutterArtifactChecks(dir, checks);
     expect(checks[0]?.status).toBe("warn");
-  });
-});
-
-describe("loadApp", () => {
-  let dir: string;
-  beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "mcpapps-audit-"));
-  });
-  afterEach(async () => {
-    await rm(dir, { recursive: true, force: true });
-  });
-
-  it("loads a module that exports `app`", async () => {
-    const entry = join(dir, "app.ts");
-    await writeFile(
-      entry,
-      'export const app = { name: "x", renderer: "vue", resourceMap: new Map(), tools: [] };',
-    );
-    const checks: Check[] = [];
-    const app = await loadApp(entry, jitiFor(dir), checks);
-    expect(app?.name).toBe("x");
-    expect(checks.some((c) => c.status === "pass")).toBe(true);
-  });
-
-  it("fails when the module doesn't export `app`", async () => {
-    const entry = join(dir, "app.ts");
-    await writeFile(entry, "export const notApp = {};");
-    const checks: Check[] = [];
-    const app = await loadApp(entry, jitiFor(dir), checks);
-    expect(app).toBeNull();
-    expect(checks[0]?.status).toBe("fail");
-  });
-
-  it("fails when the entry file doesn't exist", async () => {
-    const checks: Check[] = [];
-    const app = await loadApp(join(dir, "missing.ts"), jitiFor(dir), checks);
-    expect(app).toBeNull();
-    expect(checks[0]?.status).toBe("fail");
   });
 });
