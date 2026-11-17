@@ -1,5 +1,14 @@
 # @mcpapps/server
 
+## 0.2.1
+
+### Patch Changes
+
+- e2a37a5: Update runtime and peer dependencies to patched Hono, Zod, Vue and Vite releases.
+  Update the Node server adapter and generated Vue/Flutter projects to patched
+  versions, including Wrangler, so scaffolds do not reintroduce vulnerable pins.
+  - @mcpapps/protocol@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

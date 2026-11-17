@@ -1,5 +1,11 @@
 # @mcpapps/client-core
 
+## 0.2.1
+
+### Patch Changes
+
+- @mcpapps/protocol@0.2.1
+
 ## 0.2.0
 
 ### Patch Changes
