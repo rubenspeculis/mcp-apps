@@ -119,6 +119,27 @@ describe("createApp (flutter)", () => {
   });
 });
 
+describe("createApp dependency security", () => {
+  it.each([
+    "vue",
+    "flutter",
+  ] as const)("uses patched dependencies for %s projects", async (renderer) => {
+    await createApp({ targetDir: join(dir, "app"), renderer, dep: "workspace:*" });
+
+    const pkg = JSON.parse(await readFile(join(dir, "app", "package.json"), "utf8"));
+    expect(pkg.dependencies).toMatchObject({
+      "@hono/node-server": "^2.1.6",
+      hono: "^4.13.17",
+      zod: "4.6.7",
+    });
+    expect(pkg.devDependencies.wrangler).toBe("^4.158.0");
+    if (renderer === "vue") {
+      expect(pkg.dependencies.vue).toBe("^3.5.45");
+      expect(pkg.devDependencies.vite).toBe("^6.4.6");
+    }
+  });
+});
+
 describe("createApp safety", () => {
   it("refuses to scaffold into a non-empty directory without --force", async () => {
     await writeFile(join(dir, "existing.txt"), "x");

@@ -15,14 +15,6 @@ minimumReleaseAgeExclude:
   - "docus"
   - "exsolve"
   - "@iconify-json/*"
-  - '@cloudflare/workerd-darwin-64@1.20260625.1'
-  - '@cloudflare/workerd-darwin-arm64@1.20260625.1'
-  - '@cloudflare/workerd-linux-64@1.20260625.1'
-  - '@cloudflare/workerd-linux-arm64@1.20260625.1'
-  - '@cloudflare/workerd-windows-64@1.20260625.1'
-  - miniflare@4.20260625.0
-  - workerd@1.20260625.1
-  - wrangler@4.105.0
 
 # Single source of truth for shared tooling + framework versions. Bump HERE,
 # nowhere else. Packages reference these with "catalog:" instead of a literal.
@@ -30,10 +22,10 @@ catalog:
   # tooling
   "@biomejs/biome": 2.5.0
   turbo: 2.9.18
-  vitest: 4.1.9
-  "@vitest/coverage-v8": 4.1.9
+  vitest: 4.1.12
+  "@vitest/coverage-v8": 4.1.12
   typescript: 5.7.2
-  "@types/node": 22.10.2
+  "@types/node": 22.19.0
   lefthook: 2.1.9
   "@commitlint/cli": 21.0.2
   "@commitlint/config-conventional": 21.0.2
@@ -41,20 +33,20 @@ catalog:
   tsx: 4.22.4
   jiti: 2.4.2
   esbuild: 0.25.12
-  wrangler: 4.105.0
+  wrangler: 4.158.0
   "@changesets/cli": 2.31.0
   # `mcpapps audit --runtime` drives the dev emulator in a headless browser.
   # Lazy-imported by the CLI, so it stays a dev/CI-only dep (never shipped).
   playwright: 1.61.0
   # framework runtime
-  hono: 4.12.26
-  "@hono/node-server": 1.19.14
-  zod: 4.2.1
+  hono: 4.13.17
+  "@hono/node-server": 2.1.6
+  zod: 4.6.7
   "zod-to-json-schema": 3.24.1
-  "@modelcontextprotocol/sdk": 1.12.0
+  "@modelcontextprotocol/sdk": 1.32.2
   # vue renderer
-  vue: 3.5.38
-  vite: 6.4.3
+  vue: 3.5.45
+  vite: 6.4.6
   "@vitejs/plugin-vue": 5.2.1
   jsdom: 25.0.1
 
@@ -69,11 +61,13 @@ allowBuilds:
 
 overrides:
   tmp: ">=0.2.7"
-  js-yaml: ">=4.2.0"
-  # changesets' read-yaml-file@1 calls js-yaml's v3 `safeLoad`, removed in v4.
-  # Scope it back to the patched final v3 so the global v4 override above (kept
-  # for security elsewhere) doesn't break `changeset version`/`status`.
-  "read-yaml-file>js-yaml": "3.14.1"
+  # Keep each js-yaml major's API: read-yaml-file@1 needs v3's safeLoad.
+  "js-yaml@3": "^3.15.2"
+  "js-yaml@4": "^4.3.2"
+  "js-yaml@5": "^5.4.1"
   undici: ">=6.27.0"
   ws: ">=8.21.0"
-  esbuild: ">=0.24.3"
+  # Patch tsup's old compiler without forcing Vite/Wrangler across minor APIs.
+  "tsup>esbuild": "^0.25.12"
+  # fontless still requests the vulnerable 0.27 Windows dev server.
+  "fontless>esbuild": "^0.28.2"

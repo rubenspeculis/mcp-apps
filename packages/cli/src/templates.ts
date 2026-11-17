@@ -22,16 +22,16 @@ export function buildTemplate(opts: TemplateOptions): Record<string, string> {
 // Concrete third-party versions so the generated project installs anywhere
 // (the monorepo `catalog:` is not resolvable outside it).
 const V = {
-  hono: "^4.0.0",
-  nodeServer: "^1.0.0",
-  zod: "4.4.3",
-  vue: "^3.5.0",
-  vite: "^6.0.0",
+  hono: "^4.13.17",
+  nodeServer: "^2.1.6",
+  zod: "4.6.7",
+  vue: "^3.5.45",
+  vite: "^6.4.6",
   pluginVue: "^5.2.0",
   tsx: "^4.19.0",
   typescript: "^5.7.0",
   typesNode: "^22.10.0",
-  wrangler: "^4.105.0",
+  wrangler: "^4.158.0",
 };
 
 function vueTemplate({ name, dep }: TemplateOptions): Record<string, string> {
