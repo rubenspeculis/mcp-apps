@@ -1,5 +1,23 @@
 # @mcpapps/server
 
+## 0.2.0
+
+### Minor Changes
+
+- 5fe8a13: Add shared Claude and ChatGPT host profiles, host-aware CLI audits, and
+  profile-driven compatibility metadata. Add server authorisation and configurable
+  CORS options, and allow Flutter builds to omit font-CDN CSP declarations.
+
+  Harden the postMessage boundary and generated HTML against spoofed messages and
+  script breakouts. Validate CSP origins case-insensitively, keep the emulator's
+  protocol version aligned with the shared contract, and centralise CLI origin
+  policy and project preparation.
+
+### Patch Changes
+
+- Updated dependencies [5fe8a13]
+  - @mcpapps/protocol@0.2.0
+
 ## 0.1.4
 
 ### Patch Changes

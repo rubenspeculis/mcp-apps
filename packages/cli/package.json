@@ -1,6 +1,6 @@
 {
   "name": "@mcpapps/cli",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Scaffold and run MCP Apps: create-mcpapp + the mcpapps CLI.",
   "type": "module",
   "license": "MIT",
